@@ -1,0 +1,40 @@
+Package: gAtoms
+Type: Package
+Title: Structural Atom Decomposition of Undirected Graphs
+Version: 0.1.0
+Authors@R: person("Heng", role = c("aut", "cre"), email = "peiheng@nenu.edu.cn")
+Description: Decomposes simple undirected graphs using a C implementation of
+    recursive atom decomposition and clique minimal separator expansion built
+    on a bundled, statically linked copy of the igraph C library 1.0.1.
+    Provides deterministic perfect orderings, component
+    trees, vertex mappings, residuals and validated structural S3 objects for
+    sparse or dense graph inputs. Fits fixed-graph Gaussian concentration
+    models by combining local atom estimates and complete separator estimates.
+    Fits graphical log-linear models from categorical observations using local
+    sufficient margins and factorized distributions without a global table.
+    Computes decomposition-aware G-Wishart log normalizing constants, using
+    exact closed forms for complete prime components and clique separators and
+    optional BDgraph Monte Carlo for incomplete prime components.
+License: GPL (>= 2)
+Encoding: UTF-8
+Depends: R (>= 4.1.0)
+Imports:
+    igraph,
+    Matrix,
+    methods,
+    stats
+Suggests:
+    BDgraph,
+    ggm,
+    gRbase,
+    gRim,
+    knitr,
+    MASS,
+    rmarkdown,
+    testthat (>= 3.0.0)
+Config/testthat/edition: 3
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+SystemRequirements: C11, GNU make
+VignetteBuilder: knitr
+NeedsCompilation: yes

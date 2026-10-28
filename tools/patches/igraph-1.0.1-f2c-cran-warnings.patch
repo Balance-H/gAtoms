@@ -1,0 +1,1278 @@
+gAtoms -- bundled igraph C 1.0.1: vendor compiler-warning cleanup
+
+Target:   src/igraph/vendor/f2c/ and src/igraph/vendor/lapack/
+Base:     official igraph 1.0.1 release sources, unmodified
+Apply:    from the gAtoms package root,
+          patch -p1 < tools/patches/igraph-1.0.1-f2c-cran-warnings.patch
+
+Purpose:  let `R CMD check --as-cran` pass without a compilation WARNING.
+          R's check treats any ': warning: suggest parentheses around ...'
+          and any ': warning: ... [-Wpointer-to-int-cast]' diagnostic as a
+          significant warning and fails the package on it. The pristine
+          igraph 1.0.1 sources emit 101 such diagnostics across 37 files
+          (56 '&&' within '||', 44 arithmetic/relational operands of a
+          shift or bitwise operator, 1 pointer-to-int cast).
+
+Contents: parentheses-only edits, plus one pointer-width cast in signal_.c.
+          No algorithm, numerical result, control flow, API or object
+          manifest is changed. No -Wno-* flag and no #pragma GCC diagnostic
+          is used; nothing is silenced rather than fixed.
+
+The applied state is what src/igraph/ in this repository already contains;
+this patch exists so the change is reviewable and replayable.
+
+--- a/vendor/f2c/dfe.c
++++ b/vendor/f2c/dfe.c
+@@ -101,7 +101,7 @@
+ 	int n;
+ 	if(!f__init) f_init();
+ 	f__reading=1;
+-	if(n=c_dfe(a))return(n);
++	if((n=c_dfe(a)))return(n);
+ 	if(f__curunit->uwrt && f__nowreading(f__curunit))
+ 		err(a->cierr,errno,"read start");
+ 	f__getn = y_getc;
+@@ -123,7 +123,7 @@
+ 	int n;
+ 	if(!f__init) f_init();
+ 	f__reading=0;
+-	if(n=c_dfe(a)) return(n);
++	if((n=c_dfe(a))) return(n);
+ 	if(f__curunit->uwrt != 1 && f__nowwriting(f__curunit))
+ 		err(a->cierr,errno,"startwrt");
+ 	f__putn = x_putc;
+--- a/vendor/f2c/due.c
++++ b/vendor/f2c/due.c
+@@ -37,7 +37,7 @@
+ {
+ 	int n;
+ 	f__reading=1;
+-	if(n=c_due(a)) return(n);
++	if((n=c_due(a))) return(n);
+ 	if(f__curunit->uwrt && f__nowreading(f__curunit))
+ 		err(a->cierr,errno,"read start");
+ 	return(0);
+@@ -50,7 +50,7 @@
+ {
+ 	int n;
+ 	f__reading=0;
+-	if(n=c_due(a)) return(n);
++	if((n=c_due(a))) return(n);
+ 	if(f__curunit->uwrt != 1 && f__nowwriting(f__curunit))
+ 		err(a->cierr,errno,"write start");
+ 	return(0);
+--- a/vendor/f2c/endfile.c
++++ b/vendor/f2c/endfile.c
+@@ -43,7 +43,7 @@
+ 	if(b->ufd==NULL) {
+ 		char nbuf[10];
+ 		sprintf(nbuf,"fort.%ld",(long)a->aunit);
+-		if (tf = FOPEN(nbuf, f__w_mode[0]))
++		if ((tf = FOPEN(nbuf, f__w_mode[0])))
+ 			fclose(tf);
+ 		return(0);
+ 		}
+--- a/vendor/f2c/iio.c
++++ b/vendor/f2c/iio.c
+@@ -88,7 +88,7 @@
+ integer s_rsfi(icilist *a)
+ #endif
+ {	int n;
+-	if(n=c_si(a)) return(n);
++	if((n=c_si(a))) return(n);
+ 	f__reading=1;
+ 	f__doed=rd_ed;
+ 	f__doned=rd_ned;
+@@ -120,7 +120,7 @@
+ integer s_wsfi(icilist *a)
+ #endif
+ {	int n;
+-	if(n=c_si(a)) return(n);
++	if((n=c_si(a))) return(n);
+ 	f__reading=0;
+ 	f__doed=w_ed;
+ 	f__doned=w_ned;
+--- a/vendor/f2c/inquire.c
++++ b/vendor/f2c/inquire.c
+@@ -64,7 +64,7 @@
+ 		}
+ 	}
+ 	if(a->inex!=NULL)
+-		if(byfile && x != -1 || !byfile && p!=NULL)
++		if((byfile && x != -1) || (!byfile && p!=NULL))
+ 			*a->inex=1;
+ 		else *a->inex=0;
+ 	if(a->inopen!=NULL)
+@@ -72,7 +72,7 @@
+ 		else *a->inopen=(p!=NULL && p->ufd!=NULL);
+ 	if(a->innum!=NULL) *a->innum= p-f__units;
+ 	if(a->innamed!=NULL)
+-		if(byfile || p!=NULL && p->ufnm!=NULL)
++		if(byfile || (p!=NULL && p->ufnm!=NULL))
+ 			*a->innamed=1;
+ 		else	*a->innamed=0;
+ 	if(a->inname!=NULL)
+--- a/vendor/f2c/lbitbits.c
++++ b/vendor/f2c/lbitbits.c
+@@ -44,11 +44,11 @@
+  full_len:
+ 		if (b >= 0) {
+ 			b %= LONGBITS;
+-			return (integer)(x << b | x >> LONGBITS -b );
++			return (integer)(x << b | x >> (LONGBITS -b) );
+ 			}
+ 		b = -b;
+ 		b %= LONGBITS;
+-		return (integer)(x << LONGBITS - b | x >> b);
++		return (integer)(x << (LONGBITS - b) | x >> b);
+ 		}
+ 	y = z = (unsigned long)-1;
+ 	y <<= len;
+@@ -57,11 +57,11 @@
+ 	x &= z;
+ 	if (b >= 0) {
+ 		b %= len;
+-		return (integer)(y | z & (x << b | x >> len - b));
++		return (integer)(y | (z & ((x << b) | (x >> (len - b)))));
+ 		}
+ 	b = -b;
+ 	b %= len;
+-	return (integer)(y | z & (x >> b | x << len - b));
++	return (integer)(y | (z & ((x >> b) | (x << (len - b)))));
+ 	}
+ #ifdef __cplusplus
+ }
+--- a/vendor/f2c/lread.c
++++ b/vendor/f2c/lread.c
+@@ -102,7 +102,7 @@
+ int f__lcount,f__ltype,nml_read;
+ char *f__lchar;
+ double f__lx,f__ly;
+-#define ERR(x) if(n=(x)) return(n)
++#define ERR(x) if((n=(x))) return(n)
+ #define GETC(x) (x=(*l_getc)())
+ #define Ungetc(x,y) (*l_ungetc)(x,y)
+ 
+@@ -310,7 +310,7 @@
+ 	Ungetc(ch,f__cf);
+ 	nml_save = nml_read;
+ 	nml_read = 0;
+-	if (ch = l_R(1,0))
++	if ((ch = l_R(1,0)))
+ 		return ch;
+ 	if (!f__ltype)
+ 		errfl(f__elist->cierr,112,"no real part");
+@@ -322,7 +322,7 @@
+ 	}
+ 	while(iswhit(GETC(ch)));
+ 	(void) Ungetc(ch,f__cf);
+-	if (ch = l_R(1,0))
++	if ((ch = l_R(1,0)))
+ 		return ch;
+ 	if (!f__ltype)
+ 		errfl(f__elist->cierr,112,"no imaginary part");
+@@ -349,7 +349,7 @@
+ nmL_getc(Void)
+ {
+ 	int rv;
+-	if (rv = *nmL_next++)
++	if ((rv = *nmL_next++))
+ 		return rv;
+ 	l_getc = nmL_getc_save;
+ 	l_ungetc = nmL_ungetc_save;
+@@ -783,7 +783,7 @@
+ 	f__reading=1;
+ 	f__external=1;
+ 	f__formatted=1;
+-	if(n=c_le(a)) return(n);
++	if((n=c_le(a))) return(n);
+ 	f__lioproc = l_read;
+ 	f__lquit = 0;
+ 	f__lcount = 0;
+--- a/vendor/f2c/lwrite.c
++++ b/vendor/f2c/lwrite.c
+@@ -138,7 +138,7 @@
+ 	switch(*b) {
+ #ifndef WANT_LEAD_0
+ 		case '0':
+-			while(b[0] = b[1])
++			while((b[0] = b[1]))
+ 				b++;
+ 			break;
+ #endif
+@@ -163,7 +163,7 @@
+ 				while(*++b);
+ 				goto f__ret;
+ 			case 'E':
+-				for(c1 = '.', c = 'E';  *b = c1;
++				for(c1 = '.', c = 'E';  (*b = c1);
+ 					c1 = c, c = *++b);
+ 				goto f__ret;
+ 			}
+@@ -187,7 +187,7 @@
+ #endif
+ 	register int c;
+ 
+-	while(c = *s++)
++	while((c = *s++))
+ 		(*pn)(c);
+ 	}
+ 
+--- a/vendor/f2c/open.c
++++ b/vendor/f2c/open.c
+@@ -243,7 +243,7 @@
+ #ifdef NON_ANSI_STDIO
+  replace:
+ #endif
+-		if (tf = FOPEN(buf,f__w_mode[0]))
++		if ((tf = FOPEN(buf,f__w_mode[0])))
+ 			fclose(tf);
+ 	}
+ 
+@@ -253,9 +253,9 @@
+ 	if ((s = a->oacc) && b->url)
+ 		ufmt = 0;
+ 	if(!(tf = FOPEN(buf, f__w_mode[ufmt|2]))) {
+-		if (tf = FOPEN(buf, f__r_mode[ufmt]))
++		if ((tf = FOPEN(buf, f__r_mode[ufmt])))
+ 			b->urw = 1;
+-		else if (tf = FOPEN(buf, f__w_mode[ufmt])) {
++		else if ((tf = FOPEN(buf, f__w_mode[ufmt]))) {
+ 			b->uwrt = 1;
+ 			b->urw = 2;
+ 			}
+--- a/vendor/f2c/rdfmt.c
++++ b/vendor/f2c/rdfmt.c
+@@ -36,10 +36,10 @@
+ 
+ 	if (!hex['0']) {
+ 		sc = "0123456789";
+-		while(ch = *sc++)
++		while((ch = *sc++))
+ 			hex[ch] = ch - '0' + 1;
+ 		sc = "ABCDEF";
+-		while(ch = *sc++)
++		while((ch = *sc++))
+ 			hex[ch] = hex[ch + 'a' - 'A'] = ch - 'A' + 11;
+ 		}
+ 	s = s0 = (char *)x;
+@@ -68,7 +68,7 @@
+ 		return errno = 115;
+ 	w = (int)len;
+ 	w1 = s - s0;
+-	w2 = w1+1 >> 1;
++	w2 = (w1+1) >> 1;
+ 	t = (char *)n;
+ 	if (*(char *)&one) {
+ 		/* little endian */
+@@ -90,7 +90,7 @@
+ 		t += i;
+ 		}
+ 	do {
+-		*t = hex[*s0 & 0xff]-1 << 4 | hex[s0[1] & 0xff]-1;
++		*t = (hex[*s0 & 0xff]-1) << 4 | (hex[s0[1] & 0xff]-1);
+ 		t += i;
+ 		s0 += 2;
+ 		}
+--- a/vendor/f2c/rsfe.c
++++ b/vendor/f2c/rsfe.c
+@@ -64,7 +64,7 @@
+ 	f__sequential=1;
+ 	f__formatted=1;
+ 	f__external=1;
+-	if(n=c_sfe(a)) return(n);
++	if((n=c_sfe(a))) return(n);
+ 	f__elist=a;
+ 	f__cursor=f__recpos=0;
+ 	f__scale=0;
+--- a/vendor/f2c/rsne.c
++++ b/vendor/f2c/rsne.c
+@@ -82,7 +82,7 @@
+ 	register hashentry *h;
+ 	char *s0 = s;
+ 
+-	for(x = 0; c = *s++; x = x & 0x4000 ? ((x << 1) & 0x7fff) + 1 : x << 1)
++	for(x = 0; (c = *s++); x = x & 0x4000 ? ((x << 1) & 0x7fff) + 1 : x << 1)
+ 		x += c;
+ 	for(h = *(zot = ht->tab + x % ht->htsize); h; h = h->next)
+ 		if (!strcmp(s0, h->name))
+@@ -103,7 +103,7 @@
+ 	hashentry *he;
+ 
+ 	hashtab **x, **x0, *y;
+-	for(x = &nl_cache; y = *x; x0 = x, x = &y->next)
++	for(x = &nl_cache; (y = *x); x0 = x, x = &y->next)
+ 		if (nl == y->nl)
+ 			return y;
+ 	if (n_nlcache >= MAX_NL_CACHE) {
+@@ -155,13 +155,13 @@
+ 
+ 	if(!f__init)
+ 		f_init();
+-	for(s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; c = *s++; )
++	for(s = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"; (c = *s++); )
+ 		Alpha[c]
+ 		= Alphanum[c]
+ 		= Alpha[c + 'a' - 'A']
+ 		= Alphanum[c + 'a' - 'A']
+ 		= c;
+-	for(s = "0123456789_"; c = *s++; )
++	for(s = "0123456789_"; (c = *s++); )
+ 		Alphanum[c] = c;
+ 	}
+ 
+@@ -184,7 +184,7 @@
+ 			ch = 115;
+ 		errfl(f__elist->cierr, ch, "namelist read");
+ 		}
+-	while(*s = Alphanum[GETC(ch) & 0xff])
++	while((*s = Alphanum[GETC(ch) & 0xff]))
+ 		if (s < se)
+ 			s++;
+ 	if (ch == EOF)
+@@ -239,15 +239,15 @@
+ 	register int k;
+ 	ftnlen x2, x3;
+ 
+-	if (k = getnum(chp, x1))
++	if ((k = getnum(chp, x1)))
+ 		return k;
+ 	x3 = 1;
+ 	if (*chp == ':') {
+-		if (k = getnum(chp, &x2))
++		if ((k = getnum(chp, &x2)))
+ 			return k;
+ 		x2 -= *x1;
+ 		if (*chp == ':') {
+-			if (k = getnum(chp, &x3))
++			if ((k = getnum(chp, &x3)))
+ 				return k;
+ 			if (!x3)
+ 				return 123;
+@@ -345,7 +345,7 @@
+ #endif
+ 		}
+  have_amp:
+-	if (ch = getname(buf,sizeof(buf)))
++	if ((ch = getname(buf,sizeof(buf))))
+ 		return ch;
+ 	nl = (Namelist *)a->cifmt;
+ 	if (strcmp(buf, nl->name))
+@@ -397,10 +397,10 @@
+ 			case '&':
+ 				return 0;
+ 			default:
+-				if (ch <= ' ' && ch >= 0 || ch == ',')
++				if ((ch <= ' ' && ch >= 0) || ch == ',')
+ 					continue;
+ 				Ungetc(ch,f__cf);
+-				if (ch = getname(buf,sizeof(buf)))
++				if ((ch = getname(buf,sizeof(buf))))
+ 					return ch;
+ 				goto havename;
+ 			}
+@@ -424,8 +424,8 @@
+ 			if (!(dims = v->dims)) {
+ 				if (type != TYCHAR)
+ 					errfl(a->cierr, 122, where);
+-				if (k = getdimen(&ch, dn, (ftnlen)size,
+-						(ftnlen)size, &b))
++				if ((k = getdimen(&ch, dn, (ftnlen)size,
++						(ftnlen)size, &b)))
+ 					errfl(a->cierr, k, where);
+ 				if (ch != ')')
+ 					errfl(a->cierr, 115, where);
+@@ -441,7 +441,7 @@
+ 			nomax = span = dims[1];
+ 			ivae = iva + size*nomax;
+ 			colonseen = 0;
+-			if (k = getdimen(&ch, dn, size, nomax, &b))
++			if ((k = getdimen(&ch, dn, size, nomax, &b)))
+ 				errfl(a->cierr, k, where);
+ 			no = dn->extent;
+ 			b0 = dims[2];
+@@ -452,8 +452,8 @@
+ 					errfl(a->cierr, 115, where);
+ 				dn1 = dn + 1;
+ 				span /= *dims;
+-				if (k = getdimen(&ch, dn1, dn->delta**dims,
+-						span, &b1))
++				if ((k = getdimen(&ch, dn1, dn->delta**dims,
++						span, &b1)))
+ 					errfl(a->cierr, k, where);
+ 				ex *= *dims;
+ 				b += b1*ex;
+@@ -472,7 +472,7 @@
+ 			no1 = 1;
+ 			dn0 = dimens;
+ 			if (type == TYCHAR && ch == '(' /*)*/) {
+-				if (k = getdimen(&ch, &substr, size, size, &b))
++				if ((k = getdimen(&ch, &substr, size, size, &b)))
+ 					errfl(a->cierr, k, where);
+ 				if (ch != ')')
+ 					errfl(a->cierr, 115, where);
+@@ -507,7 +507,7 @@
+ 				dn1->delta -= ex;
+ 				}
+ 			}
+-		else if (dims = v->dims) {
++		else if ((dims = v->dims)) {
+ 			no = no1 = dims[1];
+ 			ivae = iva + no*size;
+ 			}
+@@ -527,7 +527,7 @@
+ 			else if (iva + no1*size > ivae)
+ 				no1 = (ivae - iva)/size;
+ 			f__lquit = 0;
+-			if (k = l_read(&no1, vaddr + iva, size, type))
++			if ((k = l_read(&no1, vaddr + iva, size, type)))
+ 				return k;
+ 			if (f__lquit == 1)
+ 				return 0;
+@@ -537,8 +537,8 @@
+ 					no2 = (ivae - iva)/size;
+ 					if (no2 > f__lcount)
+ 						no2 = f__lcount;
+-					if (k = l_read(&no2, vaddr + iva,
+-							size, type))
++					if ((k = l_read(&no2, vaddr + iva,
++							size, type)))
+ 						return k;
+ 					iva += no2 * dn0->delta;
+ 					}
+@@ -599,7 +599,7 @@
+ 
+ 	f__external=1;
+ 	l_eof = 0;
+-	if(n = c_le(a))
++	if((n = c_le(a)))
+ 		return n;
+ 	if(f__curunit->uwrt && f__nowreading(f__curunit))
+ 		err(a->cierr,errno,where0);
+--- a/vendor/f2c/signal_.c
++++ b/vendor/f2c/signal_.c
+@@ -1,5 +1,6 @@
+ #include "f2c.h"
+ #include "signal1.h"
++#include <stdint.h>
+ #ifdef __cplusplus
+ extern "C" {
+ #endif
+@@ -12,9 +13,17 @@
+ #endif
+ {
+ 	int sig;
++	intptr_t prev;
+ 	sig = (int)*sigp;
+ 
+-	return (ftnint)signal(sig, proc);
++	/* signal() returns the previous handler as a function pointer.  Convert it
++	   in two steps -- through void*, then through intptr_t -- so the pointer is
++	   widened to its own width before being narrowed to f2c's legacy 32-bit
++	   ftnint return type.  Behaviour preserving: the original code also narrowed
++	   straight to ftnint, so no truncation is added or removed.  No igraph code
++	   calls signal_ or uses its result. */
++	prev = (intptr_t)(void *)signal(sig, proc);
++	return (ftnint)prev;
+ 	}
+ #ifdef __cplusplus
+ }
+--- a/vendor/f2c/sue.c
++++ b/vendor/f2c/sue.c
+@@ -35,7 +35,7 @@
+ 	int n;
+ 	if(!f__init) f_init();
+ 	f__reading=1;
+-	if(n=c_sue(a)) return(n);
++	if((n=c_sue(a))) return(n);
+ 	f__recpos=0;
+ 	if(f__curunit->uwrt && f__nowreading(f__curunit))
+ 		err(a->cierr, errno, "read start");
+@@ -58,7 +58,7 @@
+ {
+ 	int n;
+ 	if(!f__init) f_init();
+-	if(n=c_sue(a)) return(n);
++	if((n=c_sue(a))) return(n);
+ 	f__reading=0;
+ 	f__reclen=0;
+ 	if(f__curunit->uwrt != 1 && f__nowwriting(f__curunit))
+--- a/vendor/f2c/wref.c
++++ b/vendor/f2c/wref.c
+@@ -137,7 +137,7 @@
+ 	/* exponent field if it fits.	*/
+ #else
+ 		if (!e0) {
+-			for(s -= 2, e1 = 2; s[0] = s[1]; s++)
++			for(s -= 2, e1 = 2; (s[0] = s[1]); s++)
+ #ifdef CRAY
+ 				delta--;
+ 			if ((delta += 4) < 0)
+@@ -233,7 +233,7 @@
+ #endif
+ 		}
+ 
+-	if (n = f__scale)
++	if ((n = f__scale))
+ 		if (n > 0)
+ 			do x *= 10.; while(--n > 0);
+ 		else
+@@ -283,7 +283,7 @@
+ 		PUT('-');
+ 	else if (f__cplus)
+ 		PUT('+');
+-	while(n = *b++)
++	while((n = *b++))
+ 		PUT(n);
+ 	while(--d1 >= 0)
+ 		PUT('0');
+--- a/vendor/f2c/wsfe.c
++++ b/vendor/f2c/wsfe.c
+@@ -52,7 +52,7 @@
+ 	f__sequential=1;
+ 	f__formatted=1;
+ 	f__external=1;
+-	if(n=c_sfe(a)) return(n);
++	if((n=c_sfe(a))) return(n);
+ 	f__elist=a;
+ 	f__hiwater = f__cursor=f__recpos=0;
+ 	f__nonl = 0;
+--- a/vendor/f2c/wsle.c
++++ b/vendor/f2c/wsle.c
+@@ -14,7 +14,7 @@
+ #endif
+ {
+ 	int n;
+-	if(n=c_le(a)) return(n);
++	if((n=c_le(a))) return(n);
+ 	f__reading=0;
+ 	f__external=1;
+ 	f__formatted=1;
+--- a/vendor/f2c/wsne.c
++++ b/vendor/f2c/wsne.c
+@@ -14,7 +14,7 @@
+ {
+ 	int n;
+ 
+-	if(n=c_le(a))
++	if((n=c_le(a)))
+ 		return(n);
+ 	f__reading=0;
+ 	f__external=1;
+--- a/vendor/lapack/dgeev.c
++++ b/vendor/lapack/dgeev.c
+@@ -314,9 +314,9 @@
+ 	*info = -3;
+     } else if (*lda < max(1,*n)) {
+ 	*info = -5;
+-    } else if (*ldvl < 1 || wantvl && *ldvl < *n) {
++    } else if (*ldvl < 1 || (wantvl && *ldvl < *n)) {
+ 	*info = -9;
+-    } else if (*ldvr < 1 || wantvr && *ldvr < *n) {
++    } else if (*ldvr < 1 || (wantvr && *ldvr < *n)) {
+ 	*info = -11;
+     }
+ 
+--- a/vendor/lapack/dgeevx.c
++++ b/vendor/lapack/dgeevx.c
+@@ -438,16 +438,16 @@
+ 	*info = -2;
+     } else if (! wantvr && ! igraphlsame_(jobvr, "N")) {
+ 	*info = -3;
+-    } else if (! (wntsnn || wntsne || wntsnb || wntsnv) || (wntsne || wntsnb) 
+-	    && ! (wantvl && wantvr)) {
++    } else if (! (wntsnn || wntsne || wntsnb || wntsnv) || ((wntsne || wntsnb) 
++	    && ! (wantvl && wantvr))) {
+ 	*info = -4;
+     } else if (*n < 0) {
+ 	*info = -5;
+     } else if (*lda < max(1,*n)) {
+ 	*info = -7;
+-    } else if (*ldvl < 1 || wantvl && *ldvl < *n) {
++    } else if (*ldvl < 1 || (wantvl && *ldvl < *n)) {
+ 	*info = -11;
+-    } else if (*ldvr < 1 || wantvr && *ldvr < *n) {
++    } else if (*ldvr < 1 || (wantvr && *ldvr < *n)) {
+ 	*info = -13;
+     }
+ 
+--- a/vendor/lapack/dgemm.c
++++ b/vendor/lapack/dgemm.c
+@@ -277,7 +277,7 @@
+ 
+ /*     Quick return if possible. */
+ 
+-    if (*m == 0 || *n == 0 || (*alpha == 0. || *k == 0) && *beta == 1.) {
++    if (*m == 0 || *n == 0 || ((*alpha == 0. || *k == 0) && *beta == 1.)) {
+ 	return 0;
+     }
+ 
+--- a/vendor/lapack/dgemv.c
++++ b/vendor/lapack/dgemv.c
+@@ -219,7 +219,7 @@
+ 
+ /*     Quick return if possible. */
+ 
+-    if (*m == 0 || *n == 0 || *alpha == 0. && *beta == 1.) {
++    if (*m == 0 || *n == 0 || (*alpha == 0. && *beta == 1.)) {
+ 	return 0;
+     }
+ 
+--- a/vendor/lapack/dhseqr.c
++++ b/vendor/lapack/dhseqr.c
+@@ -425,7 +425,7 @@
+ 	*info = -5;
+     } else if (*ldh < max(1,*n)) {
+ 	*info = -7;
+-    } else if (*ldz < 1 || wantz && *ldz < max(1,*n)) {
++    } else if (*ldz < 1 || (wantz && *ldz < max(1,*n))) {
+ 	*info = -11;
+     } else if (*lwork < max(1,*n) && ! lquery) {
+ 	*info = -13;
+--- a/vendor/lapack/dlaexc.c
++++ b/vendor/lapack/dlaexc.c
+@@ -288,7 +288,7 @@
+ /*        Solve T11*X - X*T22 = scale*T12 for X. */
+ 
+ 	igraphdlasy2_(&c_false, &c_false, &c_n1, n1, n2, d__, &c__4, &d__[*n1 + 1 + 
+-		(*n1 + 1 << 2) - 5], &c__4, &d__[(*n1 + 1 << 2) - 4], &c__4, &
++		((*n1 + 1) << 2) - 5], &c__4, &d__[((*n1 + 1) << 2) - 4], &c__4, &
+ 		scale, x, &c__2, &xnorm, &ierr);
+ 
+ /*        Swap the adjacent diagonal blocks. */
+--- a/vendor/lapack/dlaqr0.c
++++ b/vendor/lapack/dlaqr0.c
+@@ -619,8 +619,8 @@
+              .    skipped if many eigenvalues have just been deflated   
+              .    or if the remaining active block is small. */
+ 
+-	    if (ld == 0 || ld * 100 <= nw * nibble && kbot - ktop + 1 > min(
+-		    nmin,nwmax)) {
++	    if (ld == 0 || (ld * 100 <= nw * nibble && kbot - ktop + 1 > min(
++		    nmin,nwmax))) {
+ 
+ /*              ==== NS = nominal number of simultaneous shifts.   
+                 .    This may be lowered (slightly) if DLAQR3   
+--- a/vendor/lapack/dlaqr4.c
++++ b/vendor/lapack/dlaqr4.c
+@@ -621,8 +621,8 @@
+              .    skipped if many eigenvalues have just been deflated   
+              .    or if the remaining active block is small. */
+ 
+-	    if (ld == 0 || ld * 100 <= nw * nibble && kbot - ktop + 1 > min(
+-		    nmin,nwmax)) {
++	    if (ld == 0 || (ld * 100 <= nw * nibble && kbot - ktop + 1 > min(
++		    nmin,nwmax))) {
+ 
+ /*              ==== NS = nominal number of simultaneous shifts.   
+                 .    This may be lowered (slightly) if DLAQR2   
+--- a/vendor/lapack/dlarrd.c
++++ b/vendor/lapack/dlarrd.c
+@@ -462,8 +462,8 @@
+ /*     Special Case when N=1   
+        Treat case of 1x1 matrix for quick return */
+     if (*n == 1) {
+-	if (irange == 1 || irange == 2 && d__[1] > *vl && d__[1] <= *vu || 
+-		irange == 3 && *il == 1 && *iu == 1) {
++	if (irange == 1 || (irange == 2 && d__[1] > *vl && d__[1] <= *vu) || 
++		(irange == 3 && *il == 1 && *iu == 1)) {
+ 	    *m = 1;
+ 	    w[1] = d__[1];
+ /*           The computation error of the eigenvalue is zero */
+@@ -591,8 +591,8 @@
+ 	    if (*wu >= d__[ibegin] - *pivmin) {
+ 		++nwu;
+ 	    }
+-	    if (irange == 1 || *wl < d__[ibegin] - *pivmin && *wu >= d__[
+-		    ibegin] - *pivmin) {
++	    if (irange == 1 || (*wl < d__[ibegin] - *pivmin && *wu >= d__[
++		    ibegin] - *pivmin)) {
+ 		++(*m);
+ 		w[*m] = d__[ibegin];
+ 		werr[*m] = 0.;
+@@ -861,7 +861,7 @@
+ 	}
+     }
+ 
+-    if (irange == 1 && *m != *n || irange == 3 && *m != *iu - *il + 1) {
++    if ((irange == 1 && *m != *n) || (irange == 3 && *m != *iu - *il + 1)) {
+ 	toofew = TRUE_;
+     }
+ /*     If ORDER='B', do nothing the eigenvalues are already sorted by   
+--- a/vendor/lapack/dlarre.c
++++ b/vendor/lapack/dlarre.c
+@@ -426,8 +426,8 @@
+     bsrtol = sqrt(eps);
+ /*     Treat case of 1x1 matrix for quick return */
+     if (*n == 1) {
+-	if (irange == 1 || irange == 3 && d__[1] > *vl && d__[1] <= *vu || 
+-		irange == 2 && *il == 1 && *iu == 1) {
++	if (irange == 1 || (irange == 3 && d__[1] > *vl && d__[1] <= *vu) || 
++		(irange == 2 && *il == 1 && *iu == 1)) {
+ 	    *m = 1;
+ 	    w[1] = d__[1];
+ /*           The computation error of the eigenvalue is zero */
+@@ -527,8 +527,8 @@
+ 	in = iend - ibegin + 1;
+ /*        1 X 1 block */
+ 	if (in == 1) {
+-	    if (irange == 1 || irange == 3 && d__[ibegin] > *vl && d__[ibegin]
+-		     <= *vu || irange == 2 && iblock[wbegin] == jblk) {
++	    if (irange == 1 || (irange == 3 && d__[ibegin] > *vl && d__[ibegin]
++		     <= *vu) || (irange == 2 && iblock[wbegin] == jblk)) {
+ 		++(*m);
+ 		w[*m] = d__[ibegin];
+ 		werr[*m] = 0.;
+@@ -607,7 +607,7 @@
+ 		indu = indexw[wend];
+ 	    }
+ 	}
+-	if (irange == 1 && ! forceb || usedqd) {
++	if ((irange == 1 && ! forceb) || usedqd) {
+ /*           Case of DQDS   
+              Find approximations to the extremal eigenvalues of the block */
+ 	    igraphdlarrk_(&in, &c__1, &gl, &gu, &d__[ibegin], &e2[ibegin], pivmin, &
+--- a/vendor/lapack/dlarrf.c
++++ b/vendor/lapack/dlarrf.c
+@@ -351,7 +351,7 @@
+ /* L6: */
+     }
+     sawnan1 = sawnan1 || igraphdisnan_(&max1);
+-    if (forcer || max1 <= growthbound && ! sawnan1) {
++    if (forcer || (max1 <= growthbound && ! sawnan1)) {
+ 	*sigma = lsigma;
+ 	shift = 1;
+ 	goto L100;
+@@ -383,7 +383,7 @@
+ /* L7: */
+     }
+     sawnan2 = sawnan2 || igraphdisnan_(&max2);
+-    if (forcer || max2 <= growthbound && ! sawnan2) {
++    if (forcer || (max2 <= growthbound && ! sawnan2)) {
+ 	*sigma = rsigma;
+ 	shift = 2;
+ 	goto L100;
+--- a/vendor/lapack/dlascl.c
++++ b/vendor/lapack/dlascl.c
+@@ -217,7 +217,7 @@
+ 	*info = -5;
+     } else if (*m < 0) {
+ 	*info = -6;
+-    } else if (*n < 0 || itype == 4 && *n != *m || itype == 5 && *n != *m) {
++    } else if (*n < 0 || (itype == 4 && *n != *m) || (itype == 5 && *n != *m)) {
+ 	*info = -7;
+     } else if (itype <= 3 && *lda < max(1,*m)) {
+ 	*info = -9;
+@@ -229,11 +229,11 @@
+ 	} else /* if(complicated condition) */ {
+ /* Computing MAX */
+ 	    i__1 = *n - 1;
+-	    if (*ku < 0 || *ku > max(i__1,0) || (itype == 4 || itype == 5) && 
+-		    *kl != *ku) {
++	    if (*ku < 0 || *ku > max(i__1,0) || ((itype == 4 || itype == 5) && 
++		    *kl != *ku)) {
+ 		*info = -3;
+-	    } else if (itype == 4 && *lda < *kl + 1 || itype == 5 && *lda < *
+-		    ku + 1 || itype == 6 && *lda < (*kl << 1) + *ku + 1) {
++	    } else if ((itype == 4 && *lda < *kl + 1) || (itype == 5 && *lda < *
++		    ku + 1) || (itype == 6 && *lda < (*kl << 1) + *ku + 1)) {
+ 		*info = -9;
+ 	    }
+ 	}
+--- a/vendor/lapack/dlasq2.c
++++ b/vendor/lapack/dlasq2.c
+@@ -259,7 +259,7 @@
+     d__ = 0.;
+     e = 0.;
+ 
+-    i__1 = *n - 1 << 1;
++    i__1 = (*n - 1) << 1;
+     for (k = 1; k <= i__1; k += 2) {
+ 	if (z__[k] < 0.) {
+ 	    *info = -(k + 200);
+@@ -338,8 +338,8 @@
+ /*     Reverse the qd-array, if warranted. */
+ 
+     if (z__[(i0 << 2) - 3] * 1.5 < z__[(n0 << 2) - 3]) {
+-	ipn4 = i0 + n0 << 2;
+-	i__1 = i0 + n0 - 1 << 1;
++	ipn4 = (i0 + n0) << 2;
++	i__1 = (i0 + n0 - 1) << 1;
+ 	for (i4 = i0 << 2; i4 <= i__1; i4 += 4) {
+ 	    temp = z__[i4 - 3];
+ 	    z__[i4 - 3] = z__[ipn4 - i4 - 3];
+@@ -359,7 +359,7 @@
+ 
+ 	d__ = z__[(n0 << 2) + pp - 3];
+ 	i__1 = (i0 << 2) + pp;
+-	for (i4 = (n0 - 1 << 2) + pp; i4 >= i__1; i4 += -4) {
++	for (i4 = ((n0 - 1) << 2) + pp; i4 >= i__1; i4 += -4) {
+ 	    if (z__[i4 - 1] <= tol2 * d__) {
+ 		z__[i4 - 1] = -0.;
+ 		d__ = z__[i4 - 3];
+@@ -373,7 +373,7 @@
+ 
+ 	emin = z__[(i0 << 2) + pp + 1];
+ 	d__ = z__[(i0 << 2) + pp - 3];
+-	i__1 = (n0 - 1 << 2) + pp;
++	i__1 = ((n0 - 1) << 2) + pp;
+ 	for (i4 = (i0 << 2) + pp; i4 <= i__1; i4 += 4) {
+ 	    z__[i4 - (pp << 1) - 2] = d__ + z__[i4 - 1];
+ 	    if (z__[i4 - 1] <= tol2 * d__) {
+@@ -428,7 +428,7 @@
+ 
+     iter = 2;
+     nfail = 0;
+-    ndiv = n0 - i0 << 1;
++    ndiv = (n0 - i0) << 1;
+ 
+     i__1 = *n + 1;
+     for (iwhila = 1; iwhila <= i__1; ++iwhila) {
+@@ -502,11 +502,11 @@
+ 		}
+ /* L110: */
+ 	    }
+-	    if (kmin - i0 << 1 < n0 - kmin && deemin <= z__[(n0 << 2) - 3] * 
++	    if ((kmin - i0) << 1 < n0 - kmin && deemin <= z__[(n0 << 2) - 3] * 
+ 		    .5) {
+-		ipn4 = i0 + n0 << 2;
++		ipn4 = (i0 + n0) << 2;
+ 		pp = 2;
+-		i__2 = i0 + n0 - 1 << 1;
++		i__2 = (i0 + n0 - 1) << 1;
+ 		for (i4 = i0 << 2; i4 <= i__2; i4 += 4) {
+ 		    temp = z__[i4 - 3];
+ 		    z__[i4 - 3] = z__[ipn4 - i4 - 3];
+@@ -561,7 +561,7 @@
+ 		    qmax = z__[(i0 << 2) - 3];
+ 		    emin = z__[(i0 << 2) - 1];
+ 		    oldemn = z__[i0 * 4];
+-		    i__3 = n0 - 3 << 2;
++		    i__3 = (n0 - 3) << 2;
+ 		    for (i4 = i0 << 2; i4 <= i__3; i4 += 4) {
+ 			if (z__[i4] <= tol2 * z__[i4 - 3] || z__[i4 - 1] <= 
+ 				tol2 * sigma) {
+--- a/vendor/lapack/dlasq3.c
++++ b/vendor/lapack/dlasq3.c
+@@ -314,8 +314,8 @@
+ 
+     if (*dmin__ <= 0. || *n0 < n0in) {
+ 	if (z__[(*i0 << 2) + *pp - 3] * 1.5 < z__[(*n0 << 2) + *pp - 3]) {
+-	    ipn4 = *i0 + *n0 << 2;
+-	    i__1 = *i0 + *n0 - 1 << 1;
++	    ipn4 = (*i0 + *n0) << 2;
++	    i__1 = (*i0 + *n0 - 1) << 1;
+ 	    for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		temp = z__[j4 - 3];
+ 		z__[j4 - 3] = z__[ipn4 - j4 - 3];
+@@ -377,12 +377,12 @@
+ 
+ 	goto L90;
+ 
+-    } else if (*dmin__ < 0. && *dmin1 > 0. && z__[(*n0 - 1 << 2) - *pp] < tol 
++    } else if (*dmin__ < 0. && *dmin1 > 0. && z__[((*n0 - 1) << 2) - *pp] < tol 
+ 	    * (*sigma + *dn1) && abs(*dn) < tol * *sigma) {
+ 
+ /*        Convergence hidden by negative DN. */
+ 
+-	z__[(*n0 - 1 << 2) - *pp + 2] = 0.;
++	z__[((*n0 - 1) << 2) - *pp + 2] = 0.;
+ 	*dmin__ = 0.;
+ 	goto L90;
+     } else if (*dmin__ < 0.) {
+--- a/vendor/lapack/dlasq5.c
++++ b/vendor/lapack/dlasq5.c
+@@ -202,7 +202,7 @@
+ /*        Code for IEEE arithmetic. */
+ 
+ 	    if (*pp == 0) {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 2] = d__ + z__[j4 - 1];
+ 		    temp = z__[j4 + 1] / z__[j4 - 2];
+@@ -215,7 +215,7 @@
+ /* L10: */
+ 		}
+ 	    } else {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 3] = d__ + z__[j4];
+ 		    temp = z__[j4 + 2] / z__[j4 - 3];
+@@ -233,7 +233,7 @@
+ 
+ 	    *dnm2 = d__;
+ 	    *dmin2 = *dmin__;
+-	    j4 = (*n0 - 2 << 2) - *pp;
++	    j4 = ((*n0 - 2) << 2) - *pp;
+ 	    j4p2 = j4 + (*pp << 1) - 1;
+ 	    z__[j4 - 2] = *dnm2 + z__[j4p2];
+ 	    z__[j4] = z__[j4p2 + 2] * (z__[j4p2] / z__[j4 - 2]);
+@@ -253,7 +253,7 @@
+ /*        Code for non IEEE arithmetic. */
+ 
+ 	    if (*pp == 0) {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 2] = d__ + z__[j4 - 1];
+ 		    if (d__ < 0.) {
+@@ -269,7 +269,7 @@
+ /* L30: */
+ 		}
+ 	    } else {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 3] = d__ + z__[j4];
+ 		    if (d__ < 0.) {
+@@ -290,7 +290,7 @@
+ 
+ 	    *dnm2 = d__;
+ 	    *dmin2 = *dmin__;
+-	    j4 = (*n0 - 2 << 2) - *pp;
++	    j4 = ((*n0 - 2) << 2) - *pp;
+ 	    j4p2 = j4 + (*pp << 1) - 1;
+ 	    z__[j4 - 2] = *dnm2 + z__[j4p2];
+ 	    if (*dnm2 < 0.) {
+@@ -326,7 +326,7 @@
+ /*     Code for IEEE arithmetic. */
+ 
+ 	    if (*pp == 0) {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 2] = d__ + z__[j4 - 1];
+ 		    temp = z__[j4 + 1] / z__[j4 - 2];
+@@ -342,7 +342,7 @@
+ /* L50: */
+ 		}
+ 	    } else {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 3] = d__ + z__[j4];
+ 		    temp = z__[j4 + 2] / z__[j4 - 3];
+@@ -363,7 +363,7 @@
+ 
+ 	    *dnm2 = d__;
+ 	    *dmin2 = *dmin__;
+-	    j4 = (*n0 - 2 << 2) - *pp;
++	    j4 = ((*n0 - 2) << 2) - *pp;
+ 	    j4p2 = j4 + (*pp << 1) - 1;
+ 	    z__[j4 - 2] = *dnm2 + z__[j4p2];
+ 	    z__[j4] = z__[j4p2 + 2] * (z__[j4p2] / z__[j4 - 2]);
+@@ -383,7 +383,7 @@
+ /*     Code for non IEEE arithmetic. */
+ 
+ 	    if (*pp == 0) {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 2] = d__ + z__[j4 - 1];
+ 		    if (d__ < 0.) {
+@@ -402,7 +402,7 @@
+ /* L70: */
+ 		}
+ 	    } else {
+-		i__1 = *n0 - 3 << 2;
++		i__1 = (*n0 - 3) << 2;
+ 		for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 		    z__[j4 - 3] = d__ + z__[j4];
+ 		    if (d__ < 0.) {
+@@ -426,7 +426,7 @@
+ 
+ 	    *dnm2 = d__;
+ 	    *dmin2 = *dmin__;
+-	    j4 = (*n0 - 2 << 2) - *pp;
++	    j4 = ((*n0 - 2) << 2) - *pp;
+ 	    j4p2 = j4 + (*pp << 1) - 1;
+ 	    z__[j4 - 2] = *dnm2 + z__[j4p2];
+ 	    if (*dnm2 < 0.) {
+--- a/vendor/lapack/dlasq6.c
++++ b/vendor/lapack/dlasq6.c
+@@ -169,7 +169,7 @@
+     *dmin__ = d__;
+ 
+     if (*pp == 0) {
+-	i__1 = *n0 - 3 << 2;
++	i__1 = (*n0 - 3) << 2;
+ 	for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 	    z__[j4 - 2] = d__ + z__[j4 - 1];
+ 	    if (z__[j4 - 2] == 0.) {
+@@ -193,7 +193,7 @@
+ /* L10: */
+ 	}
+     } else {
+-	i__1 = *n0 - 3 << 2;
++	i__1 = (*n0 - 3) << 2;
+ 	for (j4 = *i0 << 2; j4 <= i__1; j4 += 4) {
+ 	    z__[j4 - 3] = d__ + z__[j4];
+ 	    if (z__[j4 - 3] == 0.) {
+@@ -222,7 +222,7 @@
+ 
+     *dnm2 = d__;
+     *dmin2 = *dmin__;
+-    j4 = (*n0 - 2 << 2) - *pp;
++    j4 = ((*n0 - 2) << 2) - *pp;
+     j4p2 = j4 + (*pp << 1) - 1;
+     z__[j4 - 2] = *dnm2 + z__[j4p2];
+     if (z__[j4 - 2] == 0.) {
+--- a/vendor/lapack/dorm2l.c
++++ b/vendor/lapack/dorm2l.c
+@@ -253,7 +253,7 @@
+ 	return 0;
+     }
+ 
+-    if (left && notran || ! left && ! notran) {
++    if ((left && notran) || (! left && ! notran)) {
+ 	i1 = 1;
+ 	i2 = *k;
+ 	i3 = 1;
+--- a/vendor/lapack/dorm2r.c
++++ b/vendor/lapack/dorm2r.c
+@@ -253,7 +253,7 @@
+ 	return 0;
+     }
+ 
+-    if (left && ! notran || ! left && notran) {
++    if ((left && ! notran) || (! left && notran)) {
+ 	i1 = 1;
+ 	i2 = *k;
+ 	i3 = 1;
+--- a/vendor/lapack/dormql.c
++++ b/vendor/lapack/dormql.c
+@@ -340,7 +340,7 @@
+ 
+ /*        Use blocked code */
+ 
+-	if (left && notran || ! left && ! notran) {
++	if ((left && notran) || (! left && ! notran)) {
+ 	    i1 = 1;
+ 	    i2 = *k;
+ 	    i3 = nb;
+--- a/vendor/lapack/dormqr.c
++++ b/vendor/lapack/dormqr.c
+@@ -335,7 +335,7 @@
+ 
+ /*        Use blocked code */
+ 
+-	if (left && ! notran || ! left && notran) {
++	if ((left && ! notran) || (! left && notran)) {
+ 	    i1 = 1;
+ 	    i2 = *k;
+ 	    i3 = nb;
+--- a/vendor/lapack/dstebz.c
++++ b/vendor/lapack/dstebz.c
+@@ -618,8 +618,8 @@
+ 	    if (irange == 1 || wu >= d__[ibegin] - pivmin) {
+ 		++nwu;
+ 	    }
+-	    if (irange == 1 || wl < d__[ibegin] - pivmin && wu >= d__[ibegin] 
+-		    - pivmin) {
++	    if (irange == 1 || (wl < d__[ibegin] - pivmin && wu >= d__[ibegin] 
++		    - pivmin)) {
+ 		++(*m);
+ 		w[*m] = d__[ibegin];
+ 		iblock[*m] = jb;
+--- a/vendor/lapack/dstemr.c
++++ b/vendor/lapack/dstemr.c
+@@ -480,7 +480,7 @@
+ 	*info = -8;
+     } else if (indeig && (iiu < iil || iiu > *n)) {
+ 	*info = -9;
+-    } else if (*ldz < 1 || wantz && *ldz < *n) {
++    } else if (*ldz < 1 || (wantz && *ldz < *n)) {
+ 	*info = -13;
+     } else if (*lwork < lwmin && ! lquery) {
+ 	*info = -17;
+@@ -561,7 +561,7 @@
+ 	} else if (wantz && ! zquery) {
+ 	    igraphdlaev2_(&d__[1], &e[1], &d__[2], &r1, &r2, &cs, &sn);
+ 	}
+-	if (alleig || valeig && r2 > wl && r2 <= wu || indeig && iil == 1) {
++	if (alleig || (valeig && r2 > wl && r2 <= wu) || (indeig && iil == 1)) {
+ 	    ++(*m);
+ 	    w[*m] = r2;
+ 	    if (wantz && ! zquery) {
+@@ -582,7 +582,7 @@
+ 		}
+ 	    }
+ 	}
+-	if (alleig || valeig && r1 > wl && r1 <= wu || indeig && iiu == 2) {
++	if (alleig || (valeig && r1 > wl && r1 <= wu) || (indeig && iiu == 2)) {
+ 	    ++(*m);
+ 	    w[*m] = r1;
+ 	    if (wantz && ! zquery) {
+--- a/vendor/lapack/dsteqr.c
++++ b/vendor/lapack/dsteqr.c
+@@ -236,7 +236,7 @@
+ 	*info = -1;
+     } else if (*n < 0) {
+ 	*info = -2;
+-    } else if (*ldz < 1 || icompz > 0 && *ldz < max(1,*n)) {
++    } else if (*ldz < 1 || (icompz > 0 && *ldz < max(1,*n))) {
+ 	*info = -6;
+     }
+     if (*info != 0) {
+--- a/vendor/lapack/dsyevr.c
++++ b/vendor/lapack/dsyevr.c
+@@ -484,7 +484,7 @@
+ 	}
+     }
+     if (*info == 0) {
+-	if (*ldz < 1 || wantz && *ldz < *n) {
++	if (*ldz < 1 || (wantz && *ldz < *n)) {
+ 	    *info = -15;
+ 	} else if (*lwork < lwmin && ! lquery) {
+ 	    *info = -18;
+@@ -634,7 +634,7 @@
+ /*     If all eigenvalues are desired   
+        then call DSTERF or DSTEMR and DORMTR. */
+ 
+-    if ((alleig || indeig && *il == 1 && *iu == *n) && ieeeok == 1) {
++    if ((alleig || (indeig && *il == 1 && *iu == *n)) && ieeeok == 1) {
+ 	if (! wantz) {
+ 	    igraphdcopy_(n, &work[indd], &c__1, &w[1], &c__1);
+ 	    i__1 = *n - 1;
+--- a/vendor/lapack/dsymv.c
++++ b/vendor/lapack/dsymv.c
+@@ -209,7 +209,7 @@
+ 
+ /*     Quick return if possible. */
+ 
+-    if (*n == 0 || *alpha == 0. && *beta == 1.) {
++    if (*n == 0 || (*alpha == 0. && *beta == 1.)) {
+ 	return 0;
+     }
+ 
+--- a/vendor/lapack/dsyr2k.c
++++ b/vendor/lapack/dsyr2k.c
+@@ -268,7 +268,7 @@
+ 
+ /*     Quick return if possible. */
+ 
+-    if (*n == 0 || (*alpha == 0. || *k == 0) && *beta == 1.) {
++    if (*n == 0 || ((*alpha == 0. || *k == 0) && *beta == 1.)) {
+ 	return 0;
+     }
+ 
+--- a/vendor/lapack/dsyrk.c
++++ b/vendor/lapack/dsyrk.c
+@@ -239,7 +239,7 @@
+ 
+ /*     Quick return if possible. */
+ 
+-    if (*n == 0 || (*alpha == 0. || *k == 0) && *beta == 1.) {
++    if (*n == 0 || ((*alpha == 0. || *k == 0) && *beta == 1.)) {
+ 	return 0;
+     }
+ 
+--- a/vendor/lapack/dtrevc.c
++++ b/vendor/lapack/dtrevc.c
+@@ -339,9 +339,9 @@
+ 	*info = -4;
+     } else if (*ldt < max(1,*n)) {
+ 	*info = -6;
+-    } else if (*ldvl < 1 || leftv && *ldvl < *n) {
++    } else if (*ldvl < 1 || (leftv && *ldvl < *n)) {
+ 	*info = -8;
+-    } else if (*ldvr < 1 || rightv && *ldvr < *n) {
++    } else if (*ldvr < 1 || (rightv && *ldvr < *n)) {
+ 	*info = -10;
+     } else {
+ 
+--- a/vendor/lapack/dtrexc.c
++++ b/vendor/lapack/dtrexc.c
+@@ -207,7 +207,7 @@
+ 	*info = -2;
+     } else if (*ldt < max(1,*n)) {
+ 	*info = -4;
+-    } else if (*ldq < 1 || wantq && *ldq < max(1,*n)) {
++    } else if (*ldq < 1 || (wantq && *ldq < max(1,*n))) {
+ 	*info = -6;
+     } else if (*ifst < 1 || *ifst > *n) {
+ 	*info = -7;
+--- a/vendor/lapack/dtrsen.c
++++ b/vendor/lapack/dtrsen.c
+@@ -410,7 +410,7 @@
+ 	*info = -4;
+     } else if (*ldt < max(1,*n)) {
+ 	*info = -6;
+-    } else if (*ldq < 1 || wantq && *ldq < *n) {
++    } else if (*ldq < 1 || (wantq && *ldq < *n)) {
+ 	*info = -8;
+     } else {
+ 
+--- a/vendor/lapack/dtrsna.c
++++ b/vendor/lapack/dtrsna.c
+@@ -381,9 +381,9 @@
+ 	*info = -4;
+     } else if (*ldt < max(1,*n)) {
+ 	*info = -6;
+-    } else if (*ldvl < 1 || wants && *ldvl < *n) {
++    } else if (*ldvl < 1 || (wants && *ldvl < *n)) {
+ 	*info = -8;
+-    } else if (*ldvr < 1 || wants && *ldvr < *n) {
++    } else if (*ldvr < 1 || (wants && *ldvr < *n)) {
+ 	*info = -10;
+     } else {
+ 
+@@ -423,7 +423,7 @@
+ 
+ 	if (*mm < *m) {
+ 	    *info = -13;
+-	} else if (*ldwork < 1 || wantsp && *ldwork < *n) {
++	} else if (*ldwork < 1 || (wantsp && *ldwork < *n)) {
+ 	    *info = -16;
+ 	}
+     }
+@@ -612,7 +612,7 @@
+ /* L40: */
+ 		    }
+ 		    n2 = 2;
+-		    nn = *n - 1 << 1;
++		    nn = (*n - 1) << 1;
+ 		}
+ 
+ /*              Estimate norm(inv(C**T)) */
+--- a/vendor/lapack/ilaenv.c
++++ b/vendor/lapack/ilaenv.c
+@@ -266,13 +266,13 @@
+ 
+ /*        EBCDIC character set */
+ 
+-	if (ic >= 129 && ic <= 137 || ic >= 145 && ic <= 153 || ic >= 162 && 
+-		ic <= 169) {
++	if ((ic >= 129 && ic <= 137) || (ic >= 145 && ic <= 153) || (ic >= 162 && 
++		ic <= 169)) {
+ 	    *(unsigned char *)subnam = (char) (ic + 64);
+ 	    for (i__ = 2; i__ <= 6; ++i__) {
+ 		ic = *(unsigned char *)&subnam[i__ - 1];
+-		if (ic >= 129 && ic <= 137 || ic >= 145 && ic <= 153 || ic >= 
+-			162 && ic <= 169) {
++		if ((ic >= 129 && ic <= 137) || (ic >= 145 && ic <= 153) || (ic >= 
++			162 && ic <= 169)) {
+ 		    *(unsigned char *)&subnam[i__ - 1] = (char) (ic + 64);
+ 		}
+ /* L30: */
+--- a/vendor/lapack/lsame.c
++++ b/vendor/lapack/lsame.c
+@@ -114,12 +114,12 @@
+ /*        EBCDIC is assumed - ZCODE is the EBCDIC code of either lower or   
+           upper case 'Z'. */
+ 
+-	if (inta >= 129 && inta <= 137 || inta >= 145 && inta <= 153 || inta 
+-		>= 162 && inta <= 169) {
++	if ((inta >= 129 && inta <= 137) || (inta >= 145 && inta <= 153) || (inta 
++		>= 162 && inta <= 169)) {
+ 	    inta += 64;
+ 	}
+-	if (intb >= 129 && intb <= 137 || intb >= 145 && intb <= 153 || intb 
+-		>= 162 && intb <= 169) {
++	if ((intb >= 129 && intb <= 137) || (intb >= 145 && intb <= 153) || (intb 
++		>= 162 && intb <= 169)) {
+ 	    intb += 64;
+ 	}
+ 

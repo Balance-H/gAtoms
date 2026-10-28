@@ -1,0 +1,5 @@
+^\.git$
+^\.github$
+^tools$
+^src/.*\.(o|a|dll|dll\.a|def|so|dylib)$
+^src/igraph/vendor/infomap/CITATION\.cff$

@@ -1,0 +1,219 @@
+gAtoms -- bundled third-party components
+=======================================
+
+This package statically links a bundled copy of the igraph C library. No
+external igraph installation, shared library, pkg-config file or environment
+variable is required to build or use gAtoms.
+
+
+1. igraph C library
+-------------------
+
+  Component:  igraph C library
+  Version:    1.0.1
+  Location:   src/igraph/include/        public headers
+              src/igraph/src/            library sources
+              src/igraph/vendor/         bundled third-party dependencies
+  License:    GPL (>= 2)   [igraph 1.0.1 is released under GPL-2.0-or-later]
+  Copyright:  see inst/licenses/igraph-AUTHORS.txt,
+              inst/licenses/igraph-CONTRIBUTORS.md and
+              inst/licenses/igraph-ACKNOWLEDGEMENTS.md
+  Homepage:   https://igraph.org/
+
+  The complete igraph 1.0.1 source tree is shipped. It is the official release,
+  with one narrowly scoped exception: a compiler-warning cleanup applied to 51
+  files under src/igraph/vendor/, described in section 1a below. The only other
+  files added by gAtoms are the build description, the small set of
+  configuration headers that igraph's own build system normally generates, and a
+  one-line forwarding header (see sections 1b and 1c).
+
+  igraph is licensed under the GNU General Public License version 2 or later.
+  Because gAtoms links igraph into its own shared object, the combined work is
+  distributed under the same terms: see DESCRIPTION, which declares the package
+  license as "GPL (>= 2)" -- R's standard spelling for GPL-2.0-or-later, so no
+  LICENSE file is needed at the top level because R ships the GPL text itself.
+  The igraph copy is kept here in full: inst/licenses/GPL-2.0.txt (identical to
+  the COPYING file shipped with igraph).
+
+
+1a. gAtoms compiler-warning cleanup in src/igraph/vendor/
+--------------------------------------------------------
+
+  Scope:      src/igraph/vendor/f2c/ and src/igraph/vendor/lapack/.
+              51 files, 150 changed source lines. Of those files 13 are inside
+              the compiled subset (section 1c), among them vendor/f2c/wref.c,
+              wsfe.c, open.c and endfile.c and vendor/lapack/dgemv.c, dlascl.c,
+              lsame.c and dtrevc.c.
+  Purpose:    allow a clean `R CMD check --as-cran`. R's check treats certain
+              GCC diagnostics as "significant warnings" and fails the package
+              with a WARNING when any appear during compilation. Compiled as the
+              full 700-object library, the pristine igraph 1.0.1 sources emit 101
+              such diagnostics:
+
+                56  "suggest parentheses around '&&' within '||'"
+                44  "suggest parentheses around <arithmetic> inside '<</>>'"
+                    or "... in operand of '|'"
+                 1  "cast from pointer to integer of different size"
+                    [-Wpointer-to-int-cast]
+
+  The cleanup consists of two purely mechanical, behaviour-preserving changes:
+
+    (a) Explicit parentheses, and nothing else. Every edit inserts only "(" and
+        ")". No token is added, removed, reordered or rewritten, so operator
+        precedence, evaluation order, short-circuit behaviour, assignment side
+        effects, control flow and the resulting values are all unchanged --
+        the parentheses only spell out the grouping the compiler already
+        applied. Representative cases:
+
+          if (k = getnum(chp, x1))          ->  if ((k = getnum(chp, x1)))
+          while (ch = *sc++)                ->  while ((ch = *sc++))
+          if (*ldz < 1 || wantz && *ldz < *n)
+                                            ->  if (*ldz < 1 || (wantz && *ldz < *n))
+          i__1 = n0 - 3 << 2;               ->  i__1 = (n0 - 3) << 2;
+          j4 = (*n0 - 2 << 2) - *pp;        ->  j4 = ((*n0 - 2) << 2) - *pp;
+          x >> LONGBITS - b                 ->  x >> (LONGBITS - b)
+
+        Files (f2c):   dfe.c due.c endfile.c iio.c inquire.c lbitbits.c
+                       lread.c lwrite.c open.c rdfmt.c rsfe.c rsne.c sue.c
+                       wref.c wsfe.c wsle.c wsne.c
+        Files (lapack): dgeev.c dgeevx.c dgemm.c dgemv.c dhseqr.c dlaexc.c
+                       dlaqr0.c dlaqr4.c dlarrd.c dlarre.c dlarrf.c dlascl.c
+                       dlasq2.c dlasq3.c dlasq5.c dlasq6.c dorm2l.c dorm2r.c
+                       dormql.c dormqr.c dstebz.c dstemr.c dsteqr.c dsyevr.c
+                       dsymv.c dsyr2k.c dsyrk.c dtrevc.c dtrexc.c dtrsen.c
+                       dtrsna.c ilaenv.c lsame.c
+
+    (b) One pointer-width cast in vendor/f2c/signal_.c. The function returns the
+        previous signal handler (a function pointer) in f2c's legacy 32-bit
+        `ftnint` return type. The single-step cast is split into
+          (intptr_t)(void *)signal(sig, proc)
+        so the pointer is first widened to its own width and only then narrowed
+        to ftnint. This is behaviour preserving: the original code also narrowed
+        straight to ftnint, so no truncation is added or removed; the
+        intermediate type only makes the existing narrowing explicit and keeps
+        the conversion portable. `signal_` is not declared or called anywhere in
+        igraph, so no result is consumed.
+
+  No algorithm, numerical result, control flow, API or object manifest is
+  changed. No `-Wno-*` suppression flag and no `#pragma GCC diagnostic` is used
+  anywhere, and no warning is silenced rather than fixed. The cleanup is applied
+  to the vendored sources as shipped; of those files only the subset listed in
+  src/Makevars.igraph is actually compiled (see section 1c), and that subset
+  compiles with no significant diagnostic under GCC 13 and GCC 15 in both C11
+  and C23 modes.
+
+  A replayable patch against the pristine release is kept at
+  tools/patches/igraph-1.0.1-f2c-cran-warnings.patch (tools/ is excluded from
+  the R source package).
+
+
+1b. gAtoms-added configuration headers and forwarding header
+-----------------------------------------------------------
+
+  igraph 1.0.x moved its public headers directly into include/. gAtoms sources
+  include <igraph/igraph.h>, so a single-line forwarding header is provided:
+
+    src/igraph/include/igraph/igraph.h       contains only
+                                             #include "../igraph.h"
+
+  It declares nothing, defines no macro and changes no behaviour; it exists
+  purely so the include path <igraph/igraph.h> resolves. The five configuration
+  headers igraph's own build generates are described in section 3.
+
+
+1c. Which igraph translation units gAtoms compiles
+-------------------------------------------------
+
+  The package ships the whole igraph source tree but compiles only the part the
+  gAtoms shared object needs: 189 of the 700 translation units igraph's own
+  CMake build produces. Nothing is deleted from src/igraph; the selection is
+  purely the object list in src/Makevars.igraph.
+
+  The list was derived, not guessed. Each of the 700 objects was built once and
+  its global symbols extracted with nm; the undefined symbols of gAtoms' own
+  objects (decom_h.o, r_interface.o) were then resolved transitively against the
+  symbol->provider map. That closure is 188 objects and leaves no igraph symbol
+  unresolved. Every object in it is a C translation unit, so no kept object can
+  refer to a mangled C++ name and C symbol matching is exact on every platform.
+  The one call that sits in an inactive conditional branch on Windows
+  (vendor/f2c/wref.c -> signbit_f2c) was found by scanning the kept sources for
+  identifiers naming symbols that only excluded objects define; its provider is
+  included, which brings the total to 189. That makes the manifest a superset of
+  the closure on every platform rather than a Windows-only minimum.
+
+  What is not compiled, because nothing in the closure reaches it: the whole
+  file-reading layer and its Bison parsers, the layout algorithms, community
+  detection, most centrality and path routines, the random graph generators,
+  Qhull, Infomap, plfit, PCG, GMP, and 130 of the 153 f2c runtime units. The
+  bundled LAPACK/ARPACK and CSparse clusters are compiled because
+  igraph_get_edgelist() reaches src/core/sparsemat.c, which uses both.
+
+  The five Bison-generated parsers and vendor/f2c/uninit.c, which GCC 14 reports
+  significant diagnostics for, are outside that set and are therefore never
+  compiled; no patch to them is needed.
+
+
+2. Third-party components bundled inside igraph
+-----------------------------------------------
+
+igraph itself vendors several independent libraries. The copies below are
+distributed as part of igraph and are covered by their own licenses, whose
+texts are collected in inst/licenses/.
+
+  vendor/cs         CSparse (Tim Davis)             LGPL-2.1-or-later
+  vendor/f2c        f2c runtime (netlib)            BSD-style, see the README
+  vendor/lapack     BLAS / LAPACK / ARPACK (netlib) BSD-3-clause
+  vendor/mini-gmp   mini-gmp (GNU)                  LGPL-3.0-or-later / GPL-2.0+
+  vendor/pcg        PCG random number generator     Apache-2.0
+  vendor/plfit      plfit (Clauset et al.)          MIT
+  vendor/qhull      Qhull (Brad Barber)             Qhull custom (MIT-like)
+  vendor/infomap    Infomap (Rosvall/Edler)         GPL-3.0-or-later
+
+  License texts: inst/licenses/lgpl-2.1.txt, lgpl-3.0.txt, gpl-3.0.txt,
+  Licence_CeCILL-B_V1-en.txt, Licence_CeCILL-B_V1-fr.txt,
+  vendor-cs-License.txt, vendor-f2c-README.txt, vendor-pcg-LICENSE.txt.
+  Each vendored directory also keeps its own license file in place under
+  src/igraph/vendor/.
+
+  The GNU Linear Programming Kit (GLPK) is NOT included: gAtoms does not use
+  any GLPK functionality, and igraph is compiled here with GLPK support
+  disabled (IGRAPH_GLPK_SUPPORT=OFF). This also avoids pulling in a GPL-3.0-only
+  component. No GLPK object is part of the manifest.
+
+
+3. Build configuration of the bundled copy
+------------------------------------------
+
+The bundled igraph was configured offline, once, with igraph's own CMake
+build system (CMake is a development-time tool only and is not used when
+installing gAtoms):
+
+  BUILD_SHARED_LIBS=OFF            static library
+  IGRAPH_GLPK_SUPPORT=OFF          no GLPK
+  IGRAPH_OPENMP_SUPPORT=OFF        no OpenMP runtime dependency
+  no libxml2                       no XML parser dependency
+  vendored ARPACK                  internal ARPACK
+  vendored BLAS                    internal BLAS
+  vendored LAPACK                  internal LAPACK
+  vendored mini-GMP                internal GMP
+  vendored plfit                   internal plfit
+  vendored Qhull                   internal Qhull
+  vendored Infomap                 internal Infomap
+
+The resulting configuration headers (config.h, igraph_config.h,
+igraph_export.h, igraph_threading.h, igraph_version.h) are stored verbatim in
+src/igraph/include/. That CMake run builds all 700 translation units; the subset
+gAtoms compiles, and the include paths and compile definitions it uses, are
+recorded in src/Makevars.igraph, which src/Makevars and src/Makevars.win both
+follow. Upgrading igraph therefore means repeating that one offline CMake run,
+re-deriving the subset from it (section 1c) and refreshing those files; nothing
+about it happens at install time.
+
+
+4. gAtoms itself
+----------------
+
+  gAtoms original code (R/, the gAtoms-specific C sources decom_h.c, decom_h.h,
+  r_interface.c, native_scope.h, and all documentation) is
+  Copyright (C) 2026 Heng, and is distributed under "GPL (>= 2)" as part of
+  this combined work.

@@ -1,0 +1,63 @@
+---
+title: "Gaussian concentration models on a fixed graph"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Gaussian concentration models on a fixed graph}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+library(gAtoms)
+```
+
+`fit_gaussian_graph()` estimates a Gaussian concentration matrix whose off-diagonal
+zeros are specified by an undirected graph. Supply observations in rows and
+variables in columns. Named data columns are matched to named graph vertices;
+otherwise columns follow graph order.
+
+```{r fit}
+set.seed(42)
+G <- igraph::make_ring(5, circular = FALSE)
+X <- matrix(rnorm(1000), 200, 5)
+dec <- atom_decompose(G)
+fit <- fit_gaussian_graph(X, graph = G, decomp = dec)
+fit
+summary(fit)
+logLik(fit)
+AIC(fit)
+BIC(fit)
+precision(fit)
+vcov(fit)
+```
+
+Complete atoms use exact Cholesky closed form. Incomplete atoms use the optional
+gRim package by default (`engine = "gRim"`, the default) or `engine = "ggm"` for
+the optional ggm adapter; the requested engine is used as given. gRim defaults to
+NCD and can retry covips after nonconvergence. ggm has
+no iteration-limit argument and requires positive definite local empirical
+covariances. No fitting path in this API adds ridge regularization.
+gRim supplies both `K` and `Sigma`; ggm supplies `Shat`, used as `Sigma`,
+and its adapter computes `K` by one Cholesky inversion. The returned covariance
+is retained after numerical cleanup of precision nonedges.
+
+Statistics are computed once: centered SSD divided by **n**, not n-1. With
+`mean = "zero"`, the observations are not centered. The Gaussian module
+currently requires complete finite observations.
+
+The sparse precision matrix is assembled by adding atom blocks and subtracting
+ordered separator blocks. Default covariance reconstruction uses the perfect
+ordering and canonical separator covariances. Set `covariance = "none"` to
+avoid storing a dense global covariance; `vcov()` then returns `NULL`.
+`covariance = "solve"` provides a direct inverse for small diagnostic problems.
+`vcov()` describes the fitted variables, not uncertainty of estimated parameters.
+
+Local failures raise an `atom_gaussian_error` condition carrying `status`,
+`atom_id` and `vertices`. Nonconvergence is not evidence of MLE nonexistence.
+Deviance is unavailable if the saturated empirical covariance is singular,
+even when the graph-constrained fit succeeds. See `fit$diagnostics$deviance`.
+
+`logLik()` includes the Gaussian normalizing constant. Its parameter count is
+p+m for concentration parameters plus p when estimating the mean. AIC and BIC
+use that count and the number of supplied observations.

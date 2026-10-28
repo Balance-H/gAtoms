@@ -1,0 +1,98 @@
+---
+title: "Graphical log-linear models from local margins"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Graphical log-linear models from local margins}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment="#>")
+library(gAtoms)
+```
+
+`fit_loglinear_graph()` fits a fixed undirected graphical model to complete
+categorical observations. Graph vertex names must match data column names.
+Factors retain declared levels, including unused categories. Characters and
+integer/logical labels have deterministic frozen levels. Continuous numeric
+columns and missing values are rejected. Sampling zeros are supported;
+structural-zero constraints are not implemented.
+
+```{r example}
+G <- igraph::set_vertex_attr(igraph::make_ring(4, circular=FALSE),
+                            "name", value=c("A","B","C","D"))
+dat <- expand.grid(A=c("a","b"), B=c("x","y"),
+                   C=c("u","v"), D=c("yes","no"))
+dat <- dat[rep(seq_len(nrow(dat)), 1+seq_len(nrow(dat)) %% 4), ]
+dec <- atom_decompose(G)
+fit <- fit_loglinear_graph(dat, graph=G, decomp=dec)
+fit
+summary(fit)
+logLik(fit)
+deviance(fit)
+fitted(fit, type="factorized")
+```
+
+Margins are aggregated directly from rows for the ordered atoms and separators;
+no full Cartesian count table is created. Complete atoms and separators use
+saturated closed-form estimates. Incomplete atoms use the selected engine:
+`engine = "gRim"` (the default) calls `gRim::effloglin()` and `engine = "loglin"`
+calls `stats::loglin()`; the requested engine is used as given and a failure is
+reported as an error. Local fitted generator margins
+must reproduce the observed margins. Iteration counts are `NA` when the engine
+does not expose them.
+
+Every local atom fit records which engine was requested and used:
+
+```{r provenance}
+summary(fit)$requested_engine
+summary(fit)$fallback_count
+summary(fit)$engine_provenance
+```
+
+`requested_engine` is the user request (`"gRim"` or `"loglin"`),
+`attempted_engines` lists the engines that were actually executed in order,
+`engine` is the engine that produced the fit, and `fallback` is `FALSE` with
+`fallback_reason` `NA` because an explicit engine never falls back. When the
+requested engine fails, the condition carries the failure in `attempted_engines`
+and `engine_errors`.
+
+Precomputed margins can be reused:
+
+```{r sufficient}
+ss <- margin_counts(dat, c(atoms(dec), separators(dec)))
+fit2 <- fit_loglinear_graph(ss, G, decomp=dec)
+logLik(fit2)
+```
+
+The global distribution is stored as atom probability factors divided by
+separator factors. A zero separator margin implies zero global support, so
+associated zero-over-zero configurations receive probability zero. Disconnected
+components multiply independently.
+
+`logLik()` reports the multinomial probability log-likelihood kernel
+
+$$ \ell(\hat p) = \sum_x n_x \log \hat p(x), $$
+
+conditional on the total sample size. The multinomial combinatorial constant
+$\log(n!) - \sum_x \log(n_x!)$ is omitted. This omitted term is independent of
+the fitted model and therefore cancels in likelihood-ratio deviances. Zero-count
+cells contribute zero and are absent from the sum. Deviance uses sparse counts of
+observed configurations. If a supplied statistics object lacks those counts,
+deviance is unavailable. Model degrees of freedom and AIC/BIC are not provided.
+
+Explicit full output returns **probabilities**, not counts:
+
+```{r deliberately-small-full-table}
+p <- fitted(fit, type="full")
+sum(p)
+fit$cells
+```
+
+Full output is guarded by `control$full_table_max_cells` (one million by default).
+`force=TRUE` overrides that policy limit, but cannot override the supported array
+size. Local tables have a separate `local_table_max_cells` guard. The default
+factorized output remains usable for very large global state spaces.
+`cells$full` is the theoretical Cartesian size; `total_local` and `max_local`
+describe atom tables. `log_full` remains useful if the full product overflows.

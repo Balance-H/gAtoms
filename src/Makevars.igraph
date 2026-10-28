@@ -1,0 +1,168 @@
+# gAtoms build manifest for the bundled igraph C library.
+#
+# Version: 1.0.1 (official release sources; see inst/NOTICE).
+#
+# gAtoms uses only a small part of igraph: simple undirected graph construction
+# and querying, maximum cardinality search, chordality, connectivity, clique
+# and multiplicity predicates, induced subgraphs, and the integer/pointer
+# vector containers.  The complete igraph source tree is still shipped -- only
+# the translation units that the gAtoms shared object actually needs are
+# compiled.
+#
+# The list below is not a guess.  It is the object-level transitive closure of
+# the undefined symbols of gAtoms' own objects (decom_h.o, r_interface.o) over
+# the full 700-object igraph build, computed with nm:
+#
+#   root   : 38 igraph API symbols referenced by gAtoms' C sources
+#   closure: 189 objects, every one of them a C translation unit
+#   result : no igraph symbol is left unresolved
+#
+# Every object in the closure is a .c file, so no kept object can reference a
+# mangled C++ name and C symbol matching is exact on every platform.  The one
+# call that sits in an inactive conditional branch on Windows
+# (vendor/f2c/wref.c -> signbit_f2c) was found by scanning the kept sources and
+# its provider is included, so the manifest is not Windows-specific.
+#
+# What the closure drops: the whole file-IO layer and its Bison parsers, the
+# layout algorithms, community detection, most centrality and path routines,
+# the random graph generators, Qhull, Infomap, plfit, PCG, GMP, and 130 of the
+# 153 f2c runtime units.  Nothing that is dropped is reachable from gAtoms.
+#
+# Objects live under igraph/obj/<source path below igraph/>.o, mirroring the
+# source directory depth.  The full path is kept because basenames collide
+# inside igraph (heap.c, utils.c, degree_sequence.c, voronoi.c, trees.c,
+# sampling.c); a flattened scheme would give GNU make duplicate targets.
+#
+# Dependency chain:
+#   all -> $(SHLIB) -> decom_h.o, r_interface.o, $(IGRAPH_LIB)
+#                        $(IGRAPH_LIB) -> $(IGRAPH_OBJECTS) -> $(IGRAPH_OBJDIRS)
+
+IGRAPH_LIB = igraph$(R_ARCH)/libigraph.a
+IGRAPH_LIB_DIR = igraph$(R_ARCH)
+
+IGRAPH_OBJ_C = \
+    igraph/obj/src/connectivity/components.o igraph/obj/src/constructors/basic_constructors.o igraph/obj/src/core/bitset.o \
+    igraph/obj/src/core/dqueue.o igraph/obj/src/core/error.o igraph/obj/src/core/fixed_vectorlist.o \
+    igraph/obj/src/core/interruption.o igraph/obj/src/core/matrix.o igraph/obj/src/core/memory.o \
+    igraph/obj/src/core/printing.o igraph/obj/src/core/progress.o igraph/obj/src/core/set.o \
+    igraph/obj/src/core/sparsemat.o igraph/obj/src/core/stack.o igraph/obj/src/core/strvector.o \
+    igraph/obj/src/core/vector.o igraph/obj/src/core/vector_list.o igraph/obj/src/core/vector_ptr.o \
+    igraph/obj/src/graph/adjlist.o igraph/obj/src/graph/attributes.o igraph/obj/src/graph/basic_query.o \
+    igraph/obj/src/graph/caching.o igraph/obj/src/graph/graph_list.o igraph/obj/src/graph/iterators.o \
+    igraph/obj/src/graph/type_common.o igraph/obj/src/graph/type_indexededgelist.o igraph/obj/src/internal/hacks.o \
+    igraph/obj/src/internal/qsort.o igraph/obj/src/internal/qsort_r.o igraph/obj/src/linalg/arpack.o \
+    igraph/obj/src/math/complex.o igraph/obj/src/math/utils.o igraph/obj/src/misc/chordality.o \
+    igraph/obj/src/misc/conversion.o igraph/obj/src/operators/add_edge.o igraph/obj/src/operators/subgraph.o \
+    igraph/obj/src/properties/complete.o igraph/obj/src/properties/dag.o igraph/obj/src/properties/degrees.o \
+    igraph/obj/src/properties/loops.o igraph/obj/src/properties/multiplicity.o igraph/obj/src/properties/trees.o \
+    igraph/obj/src/random/random.o igraph/obj/src/random/rng_pcg32.o igraph/obj/vendor/cs/cs_add.o \
+    igraph/obj/vendor/cs/cs_amd.o igraph/obj/vendor/cs/cs_chol.o igraph/obj/vendor/cs/cs_cholsol.o \
+    igraph/obj/vendor/cs/cs_compress.o igraph/obj/vendor/cs/cs_counts.o igraph/obj/vendor/cs/cs_cumsum.o \
+    igraph/obj/vendor/cs/cs_dfs.o igraph/obj/vendor/cs/cs_droptol.o igraph/obj/vendor/cs/cs_dropzeros.o \
+    igraph/obj/vendor/cs/cs_dupl.o igraph/obj/vendor/cs/cs_entry.o igraph/obj/vendor/cs/cs_ereach.o \
+    igraph/obj/vendor/cs/cs_etree.o igraph/obj/vendor/cs/cs_fkeep.o igraph/obj/vendor/cs/cs_gaxpy.o \
+    igraph/obj/vendor/cs/cs_happly.o igraph/obj/vendor/cs/cs_house.o igraph/obj/vendor/cs/cs_ipvec.o \
+    igraph/obj/vendor/cs/cs_leaf.o igraph/obj/vendor/cs/cs_lsolve.o igraph/obj/vendor/cs/cs_ltsolve.o \
+    igraph/obj/vendor/cs/cs_lu.o igraph/obj/vendor/cs/cs_lusol.o igraph/obj/vendor/cs/cs_malloc.o \
+    igraph/obj/vendor/cs/cs_multiply.o igraph/obj/vendor/cs/cs_permute.o igraph/obj/vendor/cs/cs_pinv.o \
+    igraph/obj/vendor/cs/cs_post.o igraph/obj/vendor/cs/cs_pvec.o igraph/obj/vendor/cs/cs_qr.o \
+    igraph/obj/vendor/cs/cs_reach.o igraph/obj/vendor/cs/cs_scatter.o igraph/obj/vendor/cs/cs_schol.o \
+    igraph/obj/vendor/cs/cs_spsolve.o igraph/obj/vendor/cs/cs_sqr.o igraph/obj/vendor/cs/cs_symperm.o \
+    igraph/obj/vendor/cs/cs_tdfs.o igraph/obj/vendor/cs/cs_transpose.o igraph/obj/vendor/cs/cs_usolve.o \
+    igraph/obj/vendor/cs/cs_util.o igraph/obj/vendor/cs/cs_utsolve.o igraph/obj/vendor/lapack/arscnd.o \
+    igraph/obj/vendor/lapack/dasum.o igraph/obj/vendor/lapack/daxpy.o igraph/obj/vendor/lapack/dcopy.o \
+    igraph/obj/vendor/lapack/ddot.o igraph/obj/vendor/lapack/dgemv.o igraph/obj/vendor/lapack/dgeqr2.o \
+    igraph/obj/vendor/lapack/dger.o igraph/obj/vendor/lapack/dgetv0.o igraph/obj/vendor/lapack/disnan.o \
+    igraph/obj/vendor/lapack/dlabad.o igraph/obj/vendor/lapack/dlacn2.o igraph/obj/vendor/lapack/dlacpy.o \
+    igraph/obj/vendor/lapack/dladiv.o igraph/obj/vendor/lapack/dlae2.o igraph/obj/vendor/lapack/dlaev2.o \
+    igraph/obj/vendor/lapack/dlaexc.o igraph/obj/vendor/lapack/dlahqr.o igraph/obj/vendor/lapack/dlaisnan.o \
+    igraph/obj/vendor/lapack/dlaln2.o igraph/obj/vendor/lapack/dlamch.o igraph/obj/vendor/lapack/dlange.o \
+    igraph/obj/vendor/lapack/dlanhs.o igraph/obj/vendor/lapack/dlanst.o igraph/obj/vendor/lapack/dlanv2.o \
+    igraph/obj/vendor/lapack/dlapy2.o igraph/obj/vendor/lapack/dlarf.o igraph/obj/vendor/lapack/dlarfg.o \
+    igraph/obj/vendor/lapack/dlarfx.o igraph/obj/vendor/lapack/dlarnv.o igraph/obj/vendor/lapack/dlartg.o \
+    igraph/obj/vendor/lapack/dlaruv.o igraph/obj/vendor/lapack/dlascl.o igraph/obj/vendor/lapack/dlaset.o \
+    igraph/obj/vendor/lapack/dlasr.o igraph/obj/vendor/lapack/dlasrt.o igraph/obj/vendor/lapack/dlassq.o \
+    igraph/obj/vendor/lapack/dlasy2.o igraph/obj/vendor/lapack/dmout.o igraph/obj/vendor/lapack/dnaitr.o \
+    igraph/obj/vendor/lapack/dnapps.o igraph/obj/vendor/lapack/dnaup2.o igraph/obj/vendor/lapack/dnaupd.o \
+    igraph/obj/vendor/lapack/dnconv.o igraph/obj/vendor/lapack/dneigh.o igraph/obj/vendor/lapack/dneupd.o \
+    igraph/obj/vendor/lapack/dngets.o igraph/obj/vendor/lapack/dnrm2.o igraph/obj/vendor/lapack/dorm2r.o \
+    igraph/obj/vendor/lapack/drot.o igraph/obj/vendor/lapack/dsaitr.o igraph/obj/vendor/lapack/dsapps.o \
+    igraph/obj/vendor/lapack/dsaup2.o igraph/obj/vendor/lapack/dsaupd.o igraph/obj/vendor/lapack/dscal.o \
+    igraph/obj/vendor/lapack/dsconv.o igraph/obj/vendor/lapack/dseigt.o igraph/obj/vendor/lapack/dsesrt.o \
+    igraph/obj/vendor/lapack/dseupd.o igraph/obj/vendor/lapack/dsgets.o igraph/obj/vendor/lapack/dsortc.o \
+    igraph/obj/vendor/lapack/dsortr.o igraph/obj/vendor/lapack/dstats.o igraph/obj/vendor/lapack/dsteqr.o \
+    igraph/obj/vendor/lapack/dstqrb.o igraph/obj/vendor/lapack/dswap.o igraph/obj/vendor/lapack/dtrevc.o \
+    igraph/obj/vendor/lapack/dtrexc.o igraph/obj/vendor/lapack/dtrmm.o igraph/obj/vendor/lapack/dtrsen.o \
+    igraph/obj/vendor/lapack/dtrsyl.o igraph/obj/vendor/lapack/dvout.o igraph/obj/vendor/lapack/fortran_intrinsics.o \
+    igraph/obj/vendor/lapack/idamax.o igraph/obj/vendor/lapack/iladlc.o igraph/obj/vendor/lapack/iladlr.o \
+    igraph/obj/vendor/lapack/ivout.o igraph/obj/vendor/lapack/len_trim.o igraph/obj/vendor/lapack/lsame.o \
+    igraph/obj/vendor/lapack/xerbla.o
+
+IGRAPH_OBJ_C_F2C = \
+    igraph/obj/vendor/f2c/close.o igraph/obj/vendor/f2c/ctype.o igraph/obj/vendor/f2c/d_lg10.o \
+    igraph/obj/vendor/f2c/d_sign.o igraph/obj/vendor/f2c/endfile.o igraph/obj/vendor/f2c/err.o \
+    igraph/obj/vendor/f2c/fmt.o igraph/obj/vendor/f2c/fmtlib.o igraph/obj/vendor/f2c/i_dnnt.o \
+    igraph/obj/vendor/f2c/i_len.o igraph/obj/vendor/f2c/open.o igraph/obj/vendor/f2c/pow_dd.o \
+    igraph/obj/vendor/f2c/pow_di.o igraph/obj/vendor/f2c/s_cmp.o igraph/obj/vendor/f2c/s_copy.o \
+    igraph/obj/vendor/f2c/s_stop.o igraph/obj/vendor/f2c/sfe.o igraph/obj/vendor/f2c/sig_die.o \
+    igraph/obj/vendor/f2c/signbit.o igraph/obj/vendor/f2c/util.o igraph/obj/vendor/f2c/wref.o \
+    igraph/obj/vendor/f2c/wrtfmt.o igraph/obj/vendor/f2c/wsfe.o
+
+IGRAPH_OBJECTS = $(IGRAPH_OBJ_C) $(IGRAPH_OBJ_C_F2C)
+
+# Every directory the objects live in.  R's own rules never create nested
+# object directories, so they are declared as order-only prerequisites below;
+# without this the assembler fails with "can't create ...: No such file or
+# directory" as soon as an object sits in a subdirectory.
+IGRAPH_OBJDIRS = \
+    igraph igraph/obj igraph/obj/src \
+    igraph/obj/src/connectivity igraph/obj/src/constructors igraph/obj/src/core \
+    igraph/obj/src/graph igraph/obj/src/internal igraph/obj/src/linalg \
+    igraph/obj/src/math igraph/obj/src/misc igraph/obj/src/operators \
+    igraph/obj/src/properties igraph/obj/src/random igraph/obj/vendor \
+    igraph/obj/vendor/cs igraph/obj/vendor/f2c igraph/obj/vendor/lapack
+
+$(IGRAPH_OBJDIRS):
+	@mkdir -p $@
+
+# Assemble the static archive.  `ar` does not create directories, hence the
+# explicit mkdir.  The archive is a prerequisite of the shared object only so
+# that it is up to date; PKG_LIBS (Makevars / Makevars.win) is what actually
+# puts it on the link line.
+$(IGRAPH_LIB): $(IGRAPH_OBJECTS)
+	@mkdir -p $(IGRAPH_LIB_DIR)
+	$(AR) crs $@ $(IGRAPH_OBJECTS)
+
+$(SHLIB): $(IGRAPH_LIB)
+
+## ---------------------------------------------------------------------------
+## Compile rules for the bundled sources.
+##
+## R has no rule that turns src/igraph/**.c into an object, so one pattern rule
+## per source extension is provided.  The object path is the source path below
+## igraph/ with the extension replaced by .o, so the % stem is that source path
+## and the prerequisite is igraph/<stem>.c.
+##
+## The compile definitions igraph's build assigned per CMake target are
+## supplied package-wide through PKG_CPPFLAGS (see Makevars / Makevars.win).
+## The two with real ABI consequences (IGRAPH_STATIC, NCOMPLEX) must be uniform
+## across the archive, which is what a package-wide definition guarantees.
+##
+## vendor/f2c is the one directory whose include path may NOT be package-wide.
+## The f2c runtime ships its own ctype.h, math.h, stdlib.h, string.h and stdio.h,
+## which its sources include with quotes.  On the global include path those
+## shadow the system headers for every other translation unit.  It is therefore
+## added only for the f2c objects, mirroring igraph's own build, which keeps
+## include paths per CMake target.
+## ---------------------------------------------------------------------------
+
+$(IGRAPH_OBJ_C): igraph/obj/%.o: igraph/%.c | $(IGRAPH_OBJDIRS)
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -c $< -o $@
+
+$(IGRAPH_OBJ_C_F2C): igraph/obj/%.o: igraph/%.c | $(IGRAPH_OBJDIRS)
+	$(CC) $(ALL_CPPFLAGS) $(ALL_CFLAGS) -Iigraph/vendor/f2c -c $< -o $@
+
+# Header dependencies for gAtoms' own translation units.
+decom_h.o: decom_h.h native_scope.h
+r_interface.o: decom_h.h
+

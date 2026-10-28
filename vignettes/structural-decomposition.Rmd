@@ -1,0 +1,55 @@
+---
+title: "Structural graph decomposition"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Structural graph decomposition}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r}
+library(gAtoms)
+g <- igraph::make_ring(6, circular = FALSE)
+g <- igraph::set_vertex_attr(g, "name", value = letters[1:6])
+dec <- atom_decompose(g)
+dec
+atoms(dec)
+separators(dec)
+prime_ordering(dec)
+validate(dec, expensive = TRUE)
+```
+
+Each connected component has an alternating sequence
+\(P_1,S_2,P_2,\ldots,S_k,P_k\). Each separator is the current atom's intersection
+with its earlier tree parent, and with the union of earlier atoms. The order is
+constructed by deterministic leaf peeling after the native atom tree is complete.
+Raw RDA separators remain available in the expert `decompose_atoms()` result;
+they are not indexed by the final ordering.
+
+```{r}
+stats::residuals(dec)
+dec$parent
+dec$children
+dec$complete
+summary(dec)
+plot(dec)
+```
+
+The native backend uses zero-based IDs. Public sets preserve names, or contain
+one-based indices when no names are supplied. `vertex_map` records both. Sparse
+adjacency inputs stay sparse throughout normalization and decomposition.
+
+```{r}
+sparse <- as_dgCMatrix(dec)
+as_igraph(sparse)
+disconnected <- igraph::disjoint_union(g, igraph::make_empty_graph(1, directed = FALSE))
+# Assign unique labels after combining independently named/unnamed graphs.
+disconnected <- igraph::set_vertex_attr(disconnected, "name", value = letters[1:7])
+forest <- atom_decompose(disconnected)
+forest$component_orderings
+validate(forest)
+```
+
+No edges or empty separators connect unrelated components. An isolated vertex
+has one atom and an ordering of length one. This structural API supports later
+statistical modules but does not implement them.

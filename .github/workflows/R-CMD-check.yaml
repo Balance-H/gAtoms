@@ -1,0 +1,59 @@
+name: R-CMD-check
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      R_KEEP_PKG_SOURCE: yes
+      NOT_CRAN: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+      - uses: r-lib/actions/setup-pandoc@v2
+      # igraph 1.0.1 is bundled in src/igraph and compiled from those sources,
+      # so no external igraph, pkg-config or MSYS2/UCRT64 igraph package is set
+      # up here any more. No IGRAPH_* environment variable is needed.
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::rcmdcheck, any::roxygen2, any::devtools
+          needs: check
+      - uses: r-lib/actions/check-r-package@v2
+        with:
+          args: 'c("--no-manual", "--as-cran")'
+          error-on: '"warning"'
+      - if: runner.os == 'Linux'
+        name: Native memory checks
+        run: |
+          sudo apt-get update && sudo apt-get install -y valgrind
+          # Build the bundled igraph sources into one archive, then compile the
+          # native smoke programs against src/decom_h.c and that archive. This
+          # uses the sources the package ships -- no pkg-config lookup and no
+          # external igraph installation. GLPK is excluded because it is
+          # disabled in the packaged configuration. Paths are anchored at the
+          # repository root so the quoted same-directory includes igraph uses
+          # resolve from any subdirectory.
+          root=$PWD
+          INC="-I$root/src/igraph/include -I$root/src/igraph/src -I$root/src/igraph/vendor \
+               -I$root/src/igraph/vendor/cs -I$root/src/igraph/vendor/f2c \
+               -I$root/src/igraph/vendor/lapack -I$root/src/igraph/vendor/infomap/src \
+               -I$root/src/igraph/vendor/mini-gmp -I$root/src/igraph/vendor/pcg \
+               -I$root/src/igraph/vendor/plfit -I$root/src/igraph/vendor/qhull/src"
+          DEFS="-DIGRAPH_STATIC -DPRPACK_IGRAPH_SUPPORT=1 -DNCOMPLEX"
+          mkdir -p /tmp/igobj
+          ( cd src/igraph/src && find . -name '*.c' -o -name '*.cpp' -o -name '*.cc' | \
+              xargs -P 4 -I{} sh -c 'cc -O2 -w '"$DEFS $INC"' -c "{}" -o /tmp/igobj/$(echo "{}" | tr "/" "_").o' )
+          ( cd src/igraph/vendor && find . \( -name '*.c' -o -name '*.cpp' \) -not -path './glpk/*' | \
+              xargs -P 4 -I{} sh -c 'cc -O2 -w '"$DEFS $INC"' -c "{}" -o /tmp/igobj/$(echo "{}" | tr "/" "_").o' )
+          ar crs /tmp/libigraph.a /tmp/igobj/*.o
+          cc -g -Isrc -I"$root/src/igraph/include" tools/native-smoke.c src/decom_h.c /tmp/libigraph.a -lm -o /tmp/gatoms-native
+          valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=1 /tmp/gatoms-native
+          cc -g -Isrc -I"$root/src/igraph/include" tools/native-faults.c src/decom_h.c /tmp/libigraph.a -Wl,--wrap=malloc -Wl,--wrap=free -o /tmp/gatoms-faults
+          /tmp/gatoms-faults

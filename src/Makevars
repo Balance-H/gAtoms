@@ -1,0 +1,105 @@
+# ---------------------------------------------------------------------------
+# gAtoms -- bundled igraph C 1.0.1, statically linked (Unix layer).
+#
+# igraph is configured offline, once, with its own CMake -- a development-time
+# tool only, never run during installation:
+#   BUILD_SHARED_LIBS=OFF, IGRAPH_GLPK_SUPPORT=OFF, IGRAPH_OPENMP_SUPPORT=OFF,
+#   vendored ARPACK / BLAS / LAPACK / GMP / PLFIT / QHULL / Infomap, no libxml2.
+# That run produced the full 700-object igraph library; gAtoms compiles only the
+# 189-object subset it actually needs.  See src/Makevars.igraph for how that
+# subset was derived and verified, and inst/NOTICE for the licences.
+#
+# Dependency chain:
+#   all -> $(SHLIB) -> decom_h.o, r_interface.o, $(IGRAPH_LIB)
+#                        $(IGRAPH_LIB) -> $(IGRAPH_OBJECTS)
+#
+# The Windows layer (src/Makevars.win) differs only in what igraph's own build
+# also varies per platform: it additionally defines MSDOS for the f2c runtime.
+# ---------------------------------------------------------------------------
+ifndef GATOMS_IGRAPH_LAYER
+GATOMS_IGRAPH_LAYER = 1
+
+# Default goal. This MUST stay the first target: R CMD INSTALL runs make with
+# no explicit goal, so the first target wins. GNU make skips a leading .PHONY
+# target when choosing the default goal, which makes $(SHLIB) the goal.
+.PHONY: all
+all: $(SHLIB)
+
+# Object directory for the bundled sources.
+IGRAPH_OBJDIR = igraph/obj
+
+# ---------------------------------------------------------------------------
+# Include paths.
+#
+# igraph's public headers live directly in include/, which is also where the
+# generated configuration headers go. src/ also carries igraph's own f2c.h,
+# which the vendored LAPACK/ARPACK sources include as "f2c.h".
+#
+# vendor/ itself is needed because src/core/sparsemat.c includes <cs/cs.h> and
+# src/random/rng_pcg32.c includes "pcg/pcg_variants.h".
+#
+# Left out on purpose:
+#
+#   vendor/f2c     Its runtime ships its own ctype.h, math.h, stdlib.h,
+#                  string.h and stdio.h, which its sources include with quotes.
+#                  On the global path those shadow the system headers for every
+#                  other translation unit.  It is added per-object in
+#                  Makevars.igraph instead.
+#   vendor/lapack  It contains a zero-byte debug.h which would shadow
+#                  libstdc++'s internal debug/debug.h.  No bundled source
+#                  includes that file.
+#   vendor/qhull, vendor/plfit, vendor/mini-gmp, vendor/infomap
+#                  Nothing in the compiled subset includes their headers, and
+#                  none of their objects are compiled.
+# ---------------------------------------------------------------------------
+IGRAPH_INC = -Iigraph/include \
+    -Iigraph/src \
+    -Iigraph/vendor \
+    -Iigraph/vendor/cs
+
+# ---------------------------------------------------------------------------
+# Compile definitions, taken from igraph 1.0.1's CMake targets.
+#
+#   IGRAPH_STATIC  every bundled target is compiled with it
+#   NCOMPLEX       PUBLIC on vendor/cs and on the igraph target itself; keeps
+#                  cs.h from pulling in <complex>, so all CSparse users share
+#                  one header ABI
+#   PRPACK_IGRAPH_SUPPORT=1  gates prpack_igraph_graph.h.  No PRPACK object is
+#                  compiled any more, but the definition is kept so the graph
+#                  headers see the same configuration igraph's build uses.
+#
+# Deliberately omitted:
+#   IGRAPH_VERIFY_FINALLY_STACK=0  igraph_error.h tests '== 1', so leaving it
+#       undefined already means 0
+#   IGRAPH_FILE_BASENAME=<file>  igraph's build passes this per translation
+#       unit purely to keep full paths out of error messages; igraph_error.h
+#       falls back to __FILE__ when it is undefined, which is the same
+#       diagnostic with a longer path
+# ---------------------------------------------------------------------------
+IGRAPH_DEFS = -DIGRAPH_STATIC -DPRPACK_IGRAPH_SUPPORT=1 -DNCOMPLEX
+
+C_STD = C11
+
+OBJECTS = decom_h.o r_interface.o
+PKG_LIBS = $(IGRAPH_LIB)
+
+# R builds ALL_CPPFLAGS as: PKG_CPPFLAGS CPPFLAGS CLINK_CPPFLAGS. Putting the
+# include path in PKG_CFLAGS (appended to ALL_CFLAGS, i.e. after
+# ALL_CPPFLAGS) and the -D definitions in PKG_CPPFLAGS reproduces the flag order
+# igraph's own build uses:
+#   -DNDEBUG ... -I<igraph dirs> -DIGRAPH_STATIC ...
+# No -Wno-* suppression is set: R CMD check --as-cran reports such flags as
+# non-portable, and a release must not silence upstream diagnostics.
+PKG_CFLAGS = $(IGRAPH_INC)
+PKG_CPPFLAGS = $(IGRAPH_DEFS)
+
+# Every object in the compiled subset is a C translation unit, so no C++ runtime
+# has to be linked. libgcc is linked statically because the compiler emits
+# helpers such as __popcountdi2 for some of the vendored bit-twiddling code; with
+# -static-libgcc the installed libs directory holds nothing but gAtoms.dll, and
+# libgcc_s_*.dll does not have to be found at run time.
+PKG_LIBS += -static-libgcc
+
+include Makevars.igraph
+
+endif

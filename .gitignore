@@ -1,0 +1,183 @@
+
+# ============================================================
+# gAtoms - Git ignore rules
+# ============================================================
+# Keep source code, documentation, tests, build scripts,
+# licenses, and bundled igraph C 1.0.1 under version control.
+#
+# IMPORTANT: The following files/directories must stay tracked:
+#
+# DESCRIPTION
+# NAMESPACE
+# .Rbuildignore
+# .github/workflows/
+# R/
+# man/
+# src/
+# src/igraph/
+# src/Makevars
+# src/Makevars.win
+# src/Makevars.igraph
+# src/install.libs.R
+# tests/
+# vignettes/
+# inst/
+# tools/patches/
+# README.md
+# LICENSE / LICENCE / COPYING / NOTICE
+#
+# Never commit generated binaries, check results, local
+# installations, temporary files, or private configuration.
+# ============================================================
+
+
+# ------------------------------------------------------------
+# 1. Compiled native artifacts
+# ------------------------------------------------------------
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.dll.a
+*.a
+*.lib
+*.exp
+*.pdb
+*.ilk
+*.exe
+
+# Native build dependency files
+*.d
+
+# Bundled igraph intermediate build directory
+/src/igraph/obj/
+
+
+# ------------------------------------------------------------
+# 2. Built R packages
+# ------------------------------------------------------------
+gAtoms_*.tar.gz
+gAtoms_*.zip
+gAtoms_*.tgz
+*.tar.gz
+
+
+# ------------------------------------------------------------
+# 3. R CMD check and installation products
+# ------------------------------------------------------------
+*.Rcheck/
+check-results/
+local-lib/
+baseline-check/
+
+# R installation lock directories
+00LOCK/
+00LOCK*/
+
+# Temporary libraries and check outputs
+/Rcheck/
+/check/
+/.Rcheck/
+
+
+# ------------------------------------------------------------
+# 4. R session and workspace files
+# ------------------------------------------------------------
+.Rhistory
+.RData
+.Ruserdata
+.RDataTmp
+.Rproj.user/
+
+# R command output files
+*.Rout
+*.Rout.fail
+
+
+# ------------------------------------------------------------
+# 5. Local scratch and work directories
+# ------------------------------------------------------------
+.work/
+tmp/
+temp/
+.cache/
+
+# Coverage reports
+coverage/
+covr/
+
+
+# ------------------------------------------------------------
+# 6. Editor and agent local state
+# ------------------------------------------------------------
+.vscode/
+.idea/
+.agents/
+.codex/
+
+# Vim / Emacs
+*.swp
+*.swo
+*~
+\#*\#
+
+
+# ------------------------------------------------------------
+# 7. Logs and temporary files
+# ------------------------------------------------------------
+*.log
+*.tmp
+
+# Local diagnostic and build logs
+00install.out
+00check.log
+*.buildlog
+
+
+# ------------------------------------------------------------
+# 8. Operating system files
+# ------------------------------------------------------------
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux / desktop trash
+.Trash-*/
+.directory
+
+
+# ------------------------------------------------------------
+# 9. Private environment and local credentials
+# ------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+.Renviron
+.Renviron.*
+
+# Local authentication tokens
+.Rapp.history
+
+
+# ------------------------------------------------------------
+# 10. Preserve CRAN and development infrastructure
+# ------------------------------------------------------------
+# DO NOT ignore:
+#
+# .github/
+# .Rbuildignore
+# .gitignore
+# src/igraph/
+# tools/patches/
+# inst/NOTICE
+#
+# These files are part of the maintained source repository.
+# ============================================================

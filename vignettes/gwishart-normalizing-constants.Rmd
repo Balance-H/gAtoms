@@ -1,0 +1,92 @@
+---
+title: "Decomposition-aware G-Wishart normalizing constants"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Decomposition-aware G-Wishart normalizing constants}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse=TRUE, comment="#>")
+library(gAtoms)
+```
+
+`gwishart_log_norm()` computes $\log I_G(b, D)$ for the G-Wishart distribution
+
+$$p(K \mid G, b, D) = I_G(b, D)^{-1} |K|^{(b-2)/2}
+  \exp\left\{-\tfrac{1}{2}\operatorname{tr}(KD)\right\},$$
+
+which is the same parameterization used by `BDgraph::gnorm()`. The shape
+parameter must be an integer of at least 3 and `D` must be a symmetric positive
+definite matrix whose rows and columns follow the graph vertex order; a matrix
+with row and column names is realigned to that order automatically.
+
+The computation uses the prime decomposition of the graph: complete prime
+components and clique separators are evaluated with the exact complete-graph
+closed form, and only an incomplete prime component is passed to the optional
+`BDgraph::gnorm()`.
+
+```{r decomposable}
+G <- igraph::set_vertex_attr(igraph::make_ring(4, circular = FALSE),
+                             "name", value = c("A", "B", "C", "D"))
+dec <- atom_decompose(G)
+dec
+
+D <- diag(4)
+fit <- gwishart_log_norm(G, b = 3, D = D, decomp = dec)
+fit$log_norm
+fit$approximate
+fit$diagnostics$n_bdgraph_calls
+```
+
+Every prime component of this path is complete, so the value is exact and
+reported as `approximate = FALSE` with zero BDgraph calls. Supplying `decomp`
+reuses the decomposition instead of computing it again.
+
+Per-component contributions and their engine labels are stored for inspection:
+
+```{r contributions}
+fit$local_summary
+fit$atom_log_norm
+fit$separator_log_norm
+```
+
+A non-chordal graph has an incomplete prime component. It is handed to
+`BDgraph::gnorm()`, and the result is then flagged as approximate because only
+that local term is a Monte Carlo estimate:
+
+```{r incomplete-prime, eval=requireNamespace("BDgraph", quietly = TRUE)}
+G4 <- igraph::set_vertex_attr(igraph::make_ring(4),
+                              "name", value = c("A", "B", "C", "D"))
+set.seed(1)
+fit4 <- gwishart_log_norm(G4, b = 3, D = diag(4), control = list(iter = 100L))
+fit4$approximate
+fit4$engine
+fit4$diagnostics$n_bdgraph_calls
+```
+
+Without BDgraph the closed-form cases above still work; only a graph with an
+incomplete prime component requires the optional package.
+
+## Reusing one decomposition across modules
+
+The same `atom_decomp` object can be passed to the companion modules, so the
+structural work is done once:
+
+```{r shared-decomposition}
+X <- matrix(stats::rnorm(40 * 4), nrow = 40, ncol = 4)
+colnames(X) <- c("A", "B", "C", "D")
+gfit <- fit_gaussian_graph(X, G, decomp = dec)
+
+dat <- expand.grid(A = c("a", "b"), B = c("a", "b"),
+                   C = c("a", "b"), D = c("a", "b"))
+dat <- dat[rep(seq_len(nrow(dat)), 1L + (seq_len(nrow(dat)) * 5L) %% 7L), ]
+lfit <- fit_loglinear_graph(dat, G, decomp = dec, engine = "loglin")
+
+classes <- c(class(gfit), class(lfit), class(fit))
+classes
+```
+
+Each module reports its own statistical quantity; only the structural
+decomposition is shared.
