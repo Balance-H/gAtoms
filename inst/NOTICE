@@ -107,8 +107,8 @@ variable is required to build or use gAtoms.
   the R source package).
 
 
-1b. gAtoms-added configuration headers and forwarding header
------------------------------------------------------------
+1b. gAtoms-added configuration headers, forwarding header and portability edits
+-------------------------------------------------------------------------------
 
   igraph 1.0.x moved its public headers directly into include/. gAtoms sources
   include <igraph/igraph.h>, so a single-line forwarding header is provided:
@@ -117,8 +117,39 @@ variable is required to build or use gAtoms.
                                              #include "../igraph.h"
 
   It declares nothing, defines no macro and changes no behaviour; it exists
-  purely so the include path <igraph/igraph.h> resolves. The five configuration
-  headers igraph's own build generates are described in section 3.
+  purely so the include path <igraph/igraph.h> resolves.
+
+  Two of the five configuration headers igraph's build generates are stored in a
+  portable form rather than verbatim, because a single copy has to serve Windows,
+  Linux and macOS and CMake would otherwise have to run at install time (it does
+  not):
+
+    src/igraph/include/igraph_export.h
+        CMake always writes IGRAPH_DEPRECATED as __declspec(deprecated), the MSVC
+        spelling, which GCC and Clang reject on Linux and macOS. The macro is
+        selected per compiler instead: __declspec for MSVC, __attribute__
+        ((deprecated)) for GCC and Clang, nothing for an unknown compiler. The
+        deprecation is still a real compiler attribute everywhere; it is never
+        defined away to empty just to silence a diagnostic. Nothing else in the
+        file differs from the generated output.
+
+    src/igraph/include/config.h
+        Upstream this file records the results of CMake feature probes on the
+        build machine. The probes are expressed as compile-time platform tests
+        instead. The Windows branch reproduces the CMake output for the bundled
+        copy token for token, so the Windows build is unchanged; the other branch
+        marks the Microsoft-only facilities as absent, which is what a POSIX host
+        reports. The entries that matter are HAVE__UMUL128 (its presence makes
+        src/random/random.c include <intrin.h>, which Linux and macOS do not
+        have), HAVE__POPCNT*/HAVE__BITSCAN* (MSVC intrinsics), HAVE__STRICMP and
+        HAVE__STRNICMP (replaced on POSIX by the HAVE_STRCASECMP and
+        HAVE_STRNCASECMP probes, which are set) and the TLS keyword. Entries that
+        record gAtoms' own build choices rather than a platform probe
+        (HAVE_INFOMAP, INTERNAL_*) are identical on every platform.
+
+  The other three generated headers (igraph_config.h, igraph_threading.h,
+  igraph_version.h) are stored verbatim; they contain no platform-specific
+  construct. Section 3 describes the configuration they were produced from.
 
 
 1c. Which igraph translation units gAtoms compiles
@@ -201,13 +232,15 @@ installing gAtoms):
   vendored Infomap                 internal Infomap
 
 The resulting configuration headers (config.h, igraph_config.h,
-igraph_export.h, igraph_threading.h, igraph_version.h) are stored verbatim in
-src/igraph/include/. That CMake run builds all 700 translation units; the subset
-gAtoms compiles, and the include paths and compile definitions it uses, are
-recorded in src/Makevars.igraph, which src/Makevars and src/Makevars.win both
-follow. Upgrading igraph therefore means repeating that one offline CMake run,
-re-deriving the subset from it (section 1c) and refreshing those files; nothing
-about it happens at install time.
+igraph_export.h, igraph_threading.h, igraph_version.h) are stored in
+src/igraph/include/. Three of them are kept exactly as generated and two are
+made platform-portable, as described in section 1b; CMake itself is never run
+when installing gAtoms. That CMake run builds all 700 translation units; the
+subset gAtoms compiles, and the include paths and compile definitions it uses,
+are recorded in src/Makevars.igraph, which src/Makevars and src/Makevars.win
+both follow. Upgrading igraph therefore means repeating that one offline CMake
+run, re-deriving the subset from it (section 1c) and refreshing those files;
+nothing about it happens at install time.
 
 
 4. gAtoms itself

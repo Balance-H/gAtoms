@@ -94,11 +94,19 @@ PKG_CFLAGS = $(IGRAPH_INC)
 PKG_CPPFLAGS = $(IGRAPH_DEFS)
 
 # Every object in the compiled subset is a C translation unit, so no C++ runtime
-# has to be linked. libgcc is linked statically because the compiler emits
-# helpers such as __popcountdi2 for some of the vendored bit-twiddling code; with
-# -static-libgcc the installed libs directory holds nothing but gAtoms.dll, and
-# libgcc_s_*.dll does not have to be found at run time.
+# has to be linked.
+#
+# -static-libgcc is a GCC driver option: it asks for libgcc to be linked
+# statically instead of libgcc_s, which the compiler needs for helpers such as
+# __popcountdi2 that the vendored bit-twiddling code pulls in.  The GCC driver on
+# Linux accepts it.  Apple's clang does not -- it rejects the flag outright
+# ("unsupported option '-static-libgcc'") and does not use libgcc at all -- so
+# the flag is added only when the compiler driver is GCC.  Windows keeps its
+# flag in Makevars.win, where the toolchain is always GCC and the behaviour has
+# already been verified.
+ifneq ($(findstring clang,$(notdir $(firstword $(CC)))),clang)
 PKG_LIBS += -static-libgcc
+endif
 
 include Makevars.igraph
 

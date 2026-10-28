@@ -21,8 +21,21 @@
 #  endif
 #endif
 
+/* The deprecation attribute is compiler specific.  CMake's export-header
+ * generator always emits __declspec(deprecated), which is the MSVC spelling and
+ * is rejected by GCC and Clang on Linux and macOS.  gAtoms ships a single copy
+ * of this file for every platform, so the attribute is selected here instead of
+ * being taken verbatim from one host's CMake run.  The deprecation is still
+ * expressed as a real compiler attribute on every platform; it is never defined
+ * away to an empty macro. */
 #ifndef IGRAPH_DEPRECATED
-#  define IGRAPH_DEPRECATED __declspec(deprecated)
+#  if defined(_MSC_VER)
+#    define IGRAPH_DEPRECATED __declspec(deprecated)
+#  elif defined(__GNUC__) || defined(__clang__)
+#    define IGRAPH_DEPRECATED __attribute__((deprecated))
+#  else
+#    define IGRAPH_DEPRECATED
+#  endif
 #endif
 
 #ifndef IGRAPH_DEPRECATED_EXPORT

@@ -2,6 +2,19 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <stdio.h>
+/* Same path/cycle as igraph_ring(), built only from the two constructors that
+ * the package actually compiles (see native-smoke.c). */
+static igraph_error_t test_ring(igraph_t *g, igraph_integer_t n, igraph_bool_t circular) {
+    igraph_integer_t i;
+    igraph_error_t e = igraph_empty(g, n, IGRAPH_UNDIRECTED);
+    if (e != IGRAPH_SUCCESS) return e;
+    for (i = 0; i + 1 < n; ++i) {
+        e = igraph_add_edge(g, i, i + 1);
+        if (e != IGRAPH_SUCCESS) return e;
+    }
+    if (circular) e = igraph_add_edge(g, n - 1, 0);
+    return e;
+}
 void *__real_malloc(size_t);
 void __real_free(void *);
 /* Test-only allocator state, never part of the package library. */
@@ -23,7 +36,7 @@ int main(void) {
     int max_attempt=0;
     for(int f=0;f<=max_attempt;++f) {
         igraph_t g,t; igraph_vector_ptr_t a,s,o;
-        assert(!igraph_ring(&g,8,0,0,mode)); assert(!igraph_empty(&t,0,0));
+        assert(!test_ring(&g,8,mode)); assert(!igraph_empty(&t,0,0));
         assert(!igraph_vector_ptr_init(&a,0)); assert(!igraph_vector_ptr_init(&s,0)); assert(!igraph_vector_ptr_init(&o,0));
         attempt=0;fail_at=f;enabled=1;
         igraph_error_t ret=decompose_atoms(&g,&a,&s,&t,&o);

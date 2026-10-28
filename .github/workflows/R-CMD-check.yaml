@@ -20,7 +20,7 @@ jobs:
       - uses: r-lib/actions/setup-pandoc@v2
       # igraph 1.0.1 is bundled in src/igraph and compiled from those sources,
       # so no external igraph, pkg-config or MSYS2/UCRT64 igraph package is set
-      # up here any more. No IGRAPH_* environment variable is needed.
+      # up here. No IGRAPH_* environment variable is needed.
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::rcmdcheck, any::roxygen2, any::devtools
@@ -32,28 +32,37 @@ jobs:
       - if: runner.os == 'Linux'
         name: Native memory checks
         run: |
+          set -euo pipefail
           sudo apt-get update && sudo apt-get install -y valgrind
-          # Build the bundled igraph sources into one archive, then compile the
-          # native smoke programs against src/decom_h.c and that archive. This
-          # uses the sources the package ships -- no pkg-config lookup and no
-          # external igraph installation. GLPK is excluded because it is
-          # disabled in the packaged configuration. Paths are anchored at the
-          # repository root so the quoted same-directory includes igraph uses
-          # resolve from any subdirectory.
-          root=$PWD
-          INC="-I$root/src/igraph/include -I$root/src/igraph/src -I$root/src/igraph/vendor \
-               -I$root/src/igraph/vendor/cs -I$root/src/igraph/vendor/f2c \
-               -I$root/src/igraph/vendor/lapack -I$root/src/igraph/vendor/infomap/src \
-               -I$root/src/igraph/vendor/mini-gmp -I$root/src/igraph/vendor/pcg \
-               -I$root/src/igraph/vendor/plfit -I$root/src/igraph/vendor/qhull/src"
-          DEFS="-DIGRAPH_STATIC -DPRPACK_IGRAPH_SUPPORT=1 -DNCOMPLEX"
-          mkdir -p /tmp/igobj
-          ( cd src/igraph/src && find . -name '*.c' -o -name '*.cpp' -o -name '*.cc' | \
-              xargs -P 4 -I{} sh -c 'cc -O2 -w '"$DEFS $INC"' -c "{}" -o /tmp/igobj/$(echo "{}" | tr "/" "_").o' )
-          ( cd src/igraph/vendor && find . \( -name '*.c' -o -name '*.cpp' \) -not -path './glpk/*' | \
-              xargs -P 4 -I{} sh -c 'cc -O2 -w '"$DEFS $INC"' -c "{}" -o /tmp/igobj/$(echo "{}" | tr "/" "_").o' )
-          ar crs /tmp/libigraph.a /tmp/igobj/*.o
-          cc -g -Isrc -I"$root/src/igraph/include" tools/native-smoke.c src/decom_h.c /tmp/libigraph.a -lm -o /tmp/gatoms-native
+
+          # Which igraph translation units get compiled is decided in exactly one
+          # place: src/Makevars.igraph. Asking make for the archive target reuses
+          # that object list instead of re-globbing the source tree, so this job
+          # compiles the same 189 units as the package and not the full set of
+          # 700. R's Makeconf supplies CC, CXX, AR and the compiler flags, so the
+          # C translation units go through the same rules as a real install and
+          # any future C++ unit would be handled too. The compiler runs with R's
+          # normal warning flags; no -w is used, so warnings stay visible.
+          R_HOME="$(R RHOME)"
+          ( cd src && make -f "${R_HOME}/etc/Makeconf" -f Makevars igraph/libigraph.a )
+
+          LIB="$(find src -name 'libigraph.a' -print -quit)"
+          test -n "${LIB}"
+
+          # The archive must contain exactly the objects the manifest names --
+          # no more (that would mean the whole source tree is being compiled) and
+          # no fewer (that would mean the list is out of date).
+          EXPECTED="$(grep -oE 'igraph/obj/[A-Za-z0-9_./-]+\.o' src/Makevars.igraph | sort -u | wc -l)"
+          NOBJ="$(ar t "${LIB}" | wc -l)"
+          echo "manifest objects: ${EXPECTED}; archive members: ${NOBJ}"
+          test "${NOBJ}" -eq "${EXPECTED}"
+
+          # Link the native harnesses against that archive and run them under
+          # valgrind. Both harnesses only use igraph entry points that the
+          # package itself compiles, so a link failure here also means the
+          # manifest lost something the package needs.
+          cc -g -Isrc -Isrc/igraph/include tools/native-smoke.c src/decom_h.c "${LIB}" -lm -o /tmp/gatoms-native
           valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=1 /tmp/gatoms-native
-          cc -g -Isrc -I"$root/src/igraph/include" tools/native-faults.c src/decom_h.c /tmp/libigraph.a -Wl,--wrap=malloc -Wl,--wrap=free -o /tmp/gatoms-faults
+
+          cc -g -Isrc -Isrc/igraph/include tools/native-faults.c src/decom_h.c "${LIB}" -Wl,--wrap=malloc -Wl,--wrap=free -o /tmp/gatoms-faults
           /tmp/gatoms-faults
