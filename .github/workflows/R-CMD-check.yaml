@@ -36,31 +36,39 @@ jobs:
           sudo apt-get update && sudo apt-get install -y valgrind
 
           # Which igraph translation units get compiled is decided in exactly one
-          # place: src/Makevars.igraph. Asking make for the archive target reuses
-          # that object list instead of re-globbing the source tree, so this job
-          # compiles the same 189 units as the package and not the full set of
-          # 700. R's Makeconf supplies CC, CXX, AR and the compiler flags, so the
-          # C translation units go through the same rules as a real install and
-          # any future C++ unit would be handled too. The compiler runs with R's
-          # normal warning flags; no -w is used, so warnings stay visible.
-          R_HOME="$(R RHOME)"
-          ( cd src && make -f "${R_HOME}/etc/Makeconf" -f Makevars igraph/libigraph.a )
+          # place: src/Makevars.igraph. Reusing it means this job compiles the
+          # same 189 units as the package instead of re-globbing the whole source
+          # tree.
+          #
+          # The build is driven by R CMD SHLIB rather than by calling make on
+          # etc/Makeconf directly. R's Makeconf is not standalone: it includes
+          # $(R_SHARE_DIR)/make/vars.mk, and R_SHARE_DIR (together with the other
+          # R_* build paths) is exported by the R CMD front end, not written into
+          # Makeconf. Invoking make by hand therefore fails at that include with
+          #     Makeconf:10: /make/vars.mk: No such file or directory
+          # as soon as R_SHARE_DIR is empty. R CMD SHLIB initialises all of that
+          # itself. It builds $(SHLIB), and src/Makevars registers the archive as
+          # a prerequisite of $(SHLIB), so the same 189 objects are compiled and
+          # src/igraph/libigraph.a (under src/igraph/<R_ARCH>/) is left behind.
+          ( cd src && R CMD SHLIB -o gatoms-ci.so )
 
           LIB="$(find src -name 'libigraph.a' -print -quit)"
           test -n "${LIB}"
 
           # The archive must contain exactly the objects the manifest names --
-          # no more (that would mean the whole source tree is being compiled) and
-          # no fewer (that would mean the list is out of date).
+          # no more (that would mean the source tree is being compiled wholesale)
+          # and no fewer (that would mean the list is out of date).
           EXPECTED="$(grep -oE 'igraph/obj/[A-Za-z0-9_./-]+\.o' src/Makevars.igraph | sort -u | wc -l)"
           NOBJ="$(ar t "${LIB}" | wc -l)"
-          echo "manifest objects: ${EXPECTED}; archive members: ${NOBJ}"
+          echo "manifest objects: ${EXPECTED}; archive members: ${NOBJ} (${LIB})"
           test "${NOBJ}" -eq "${EXPECTED}"
 
           # Link the native harnesses against that archive and run them under
-          # valgrind. Both harnesses only use igraph entry points that the
-          # package itself compiles, so a link failure here also means the
-          # manifest lost something the package needs.
+          # valgrind. Both harnesses only use igraph entry points that the package
+          # itself compiles, so a link failure here also means the manifest lost
+          # something the package needs. No -w / -Wno-*: warnings stay visible and
+          # the job has already been told to fail on any command that exits
+          # non-zero.
           cc -g -Isrc -Isrc/igraph/include tools/native-smoke.c src/decom_h.c "${LIB}" -lm -o /tmp/gatoms-native
           valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=1 /tmp/gatoms-native
 

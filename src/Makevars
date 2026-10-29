@@ -98,13 +98,22 @@ PKG_CPPFLAGS = $(IGRAPH_DEFS)
 #
 # -static-libgcc is a GCC driver option: it asks for libgcc to be linked
 # statically instead of libgcc_s, which the compiler needs for helpers such as
-# __popcountdi2 that the vendored bit-twiddling code pulls in.  The GCC driver on
-# Linux accepts it.  Apple's clang does not -- it rejects the flag outright
-# ("unsupported option '-static-libgcc'") and does not use libgcc at all -- so
-# the flag is added only when the compiler driver is GCC.  Windows keeps its
-# flag in Makevars.win, where the toolchain is always GCC and the behaviour has
-# already been verified.
-ifneq ($(findstring clang,$(notdir $(firstword $(CC)))),clang)
+# __popcountdi2 that the vendored bit-twiddling code pulls in.  On Linux the GCC
+# driver accepts it and it keeps the shared object free of a libgcc_s runtime
+# dependency.
+#
+# Apple's clang rejects the flag outright
+# ("clang: error: unsupported option '-static-libgcc'") and does not use libgcc
+# at all, so it must not be passed there.  The platform is therefore decided from
+# the operating system, not from the name of the compiler driver: on macOS
+# /usr/bin/gcc is only a shim that execs clang, so a name-based test can get the
+# answer wrong.  Windows never reads this file -- it uses Makevars.win, where the
+# flag is unconditional and the static link has already been verified.
+#
+# If uname is unavailable the test is false and the flag is left out.  That
+# direction is safe: omitting it only leaves libgcc_s to be resolved at run time,
+# whereas passing it to clang is a hard error.
+ifeq ($(shell uname -s),Linux)
 PKG_LIBS += -static-libgcc
 endif
 
