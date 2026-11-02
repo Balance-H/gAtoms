@@ -1,0 +1,69 @@
+gAtoms -- bundled igraph C 1.0.1: ARPACK reverse-communication timing variables
+
+Target:   src/igraph/vendor/lapack/dnaitr.c and dsaitr.c
+Base:     official igraph 1.0.1 release sources, unmodified
+Apply:    from the gAtoms package root,
+          patch -p1 < tools/patches/igraph-1.0.1-arpack-timing-save.patch
+
+Why:      Both routines return to the caller for a reverse-communication step
+          (*ido = 1/2, goto L9000) in the middle of a timing interval: t2 is
+          recorded with igrapharscnd_() before the return and used in
+          'tmvopx += t3 - t2' after re-entry; the same holds for t0 and t4.
+          The f2c translation left t0..t5 as plain automatic locals, so those
+          reads see an indeterminate value -- undefined behaviour, and the
+          -Wuninitialized diagnostics clang reports.  The original Fortran has
+          a Save statement covering exactly these variables together with the
+          accumulators.
+
+Change:   t0, t2 and t4 get IGRAPH_F77_SAVE (static __thread), the same
+          treatment every other cross-call local in these two files already
+          has.  t1, t3 and t5 are always written and read within one call and
+          stay automatic.  The values are timing only: they are accumulated
+          into tmvopx/tmvbx/titref/tnaitr, which are never read anywhere, so no
+          numerical result, no control flow and no Arnoldi iteration is
+          affected.
+
+--- a/vendor/lapack/dnaitr.c
++++ b/vendor/lapack/dnaitr.c
+@@ -248,7 +248,18 @@
+     /* Local variables */
+     integer i__;
+     IGRAPH_F77_SAVE integer j;
+-    real t0, t1, t2, t3, t4, t5;
++    /* Only t0, t2 and t4 are read after the routine has returned to the caller
++     * for a reverse-communication step: t0 set at L396, first read at L523 with
++     * the return at L507 in between (and again at L892); t2 set at L562 and read
++     * at L583 across the return at L573, likewise L597->L623, L673->L698 and
++     * L776->L801; t4 set at L669 and read at L883 across the returns at L685 and
++     * L789.  They therefore need Fortran SAVE semantics, which IGRAPH_F77_SAVE
++     * provides -- the same treatment the other cross-call locals above already
++     * get.  t1, t3 and t5 are always written and read inside one call, so they
++     * stay automatic.  These are timing values only and have no effect on the
++     * Arnoldi iteration. */
++    IGRAPH_F77_SAVE real t0, t2, t4;
++    real t1, t3, t5;
+     integer jj;
+     IGRAPH_F77_SAVE integer ipj, irj;
+     integer nbx=0;
+--- a/vendor/lapack/dsaitr.c
++++ b/vendor/lapack/dsaitr.c
+@@ -242,7 +242,18 @@
+     /* Local variables */
+     integer i__;
+     IGRAPH_F77_SAVE integer j;
+-    real t0, t1, t2, t3, t4, t5;
++    /* Only t0, t2 and t4 are read after the routine has returned to the caller
++     * for a reverse-communication step: t0 set at L371, first read at L508 with
++     * the return at L492 in between; t2 set at L547 and read at L567 across the
++     * return at L558, likewise L589->L614, L686->L711 and L788->L813; t4 set at
++     * L681 and read at L889 across the returns at L698 and L801.  They therefore
++     * need Fortran SAVE semantics, which IGRAPH_F77_SAVE provides -- the same
++     * treatment the other cross-call locals above already get.  t1, t3 and t5
++     * are always written and read inside one call, so they stay automatic.
++     * These are timing values only and have no effect on the Arnoldi
++     * iteration. */
++    IGRAPH_F77_SAVE real t0, t2, t4;
++    real t1, t3, t5;
+     integer jj;
+     IGRAPH_F77_SAVE integer ipj, irj;
+     integer nbx=0;

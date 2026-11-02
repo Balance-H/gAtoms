@@ -248,7 +248,18 @@ static integer c__2 = 2;
     /* Local variables */
     integer i__;
     IGRAPH_F77_SAVE integer j;
-    real t0, t1, t2, t3, t4, t5;
+    /* Only t0, t2 and t4 are read after the routine has returned to the caller
+     * for a reverse-communication step: t0 set at L396, first read at L523 with
+     * the return at L507 in between (and again at L892); t2 set at L562 and read
+     * at L583 across the return at L573, likewise L597->L623, L673->L698 and
+     * L776->L801; t4 set at L669 and read at L883 across the returns at L685 and
+     * L789.  They therefore need Fortran SAVE semantics, which IGRAPH_F77_SAVE
+     * provides -- the same treatment the other cross-call locals above already
+     * get.  t1, t3 and t5 are always written and read inside one call, so they
+     * stay automatic.  These are timing values only and have no effect on the
+     * Arnoldi iteration. */
+    IGRAPH_F77_SAVE real t0, t2, t4;
+    real t1, t3, t5;
     integer jj;
     IGRAPH_F77_SAVE integer ipj, irj;
     integer nbx=0;

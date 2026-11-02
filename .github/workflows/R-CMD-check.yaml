@@ -72,5 +72,9 @@ jobs:
           cc -g -Isrc -Isrc/igraph/include tools/native-smoke.c src/decom_h.c "${LIB}" -lm -o /tmp/gatoms-native
           valgrind --leak-check=full --errors-for-leak-kinds=definite --error-exitcode=1 /tmp/gatoms-native
 
-          cc -g -Isrc -Isrc/igraph/include tools/native-faults.c src/decom_h.c "${LIB}" -Wl,--wrap=malloc -Wl,--wrap=free -o /tmp/gatoms-faults
+          # -lm must come after the archive: the vendored LAPACK/ARPACK code in
+          # it calls round/log/sqrt/pow/exp, and a static library is only
+          # searched for the references that are still unresolved when it is
+          # reached.
+          cc -g -Isrc -Isrc/igraph/include tools/native-faults.c src/decom_h.c "${LIB}" -Wl,--wrap=malloc -Wl,--wrap=free -lm -o /tmp/gatoms-faults
           /tmp/gatoms-faults

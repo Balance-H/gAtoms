@@ -21,11 +21,13 @@ variable is required to build or use gAtoms.
   Homepage:   https://igraph.org/
 
   The complete igraph 1.0.1 source tree is shipped. It is the official release,
-  with one narrowly scoped exception: a compiler-warning cleanup applied to 51
-  files under src/igraph/vendor/, described in section 1a below. The only other
-  files added by gAtoms are the build description, the small set of
-  configuration headers that igraph's own build system normally generates, and a
-  one-line forwarding header (see sections 1b and 1c).
+  with two narrowly scoped exceptions: a compiler-warning cleanup applied to 51
+  files under src/igraph/vendor/ (section 1a), and a two-file change that gives
+  ARPACK's reverse-communication timing variables the storage duration they
+  require (section 1d). The only other files added by gAtoms are the build
+  description, the small set of configuration headers that igraph's own build
+  system normally generates, and a one-line forwarding header (see sections 1b
+  and 1c).
 
   igraph is licensed under the GNU General Public License version 2 or later.
   Because gAtoms links igraph into its own shared object, the combined work is
@@ -182,6 +184,40 @@ variable is required to build or use gAtoms.
   The five Bison-generated parsers and vendor/f2c/uninit.c, which GCC 14 reports
   significant diagnostics for, are outside that set and are therefore never
   compiled; no patch to them is needed.
+
+
+1d. ARPACK reverse-communication timing variables
+-------------------------------------------------
+
+  Scope:      src/igraph/vendor/lapack/dnaitr.c and dsaitr.c. One declaration
+              line in each file.
+  Purpose:    give t0, t2 and t4 the storage duration they need, which also
+              removes the -Wuninitialized diagnostics clang reports on macOS.
+
+  In both routines the timing interval spans a reverse-communication return: for
+  example dnaitr.c records t2 with igrapharscnd_() at line 562, returns to the
+  caller with "goto L9000" at line 573 so the caller can compute OP*v, and only
+  on re-entry at label L50 does it use the value, in
+  "tmvopx += t3 - t2" at line 583. The same pattern applies to t0 (recorded at
+  line 396, used at 523 and 892 across the return at 507) and to t4 (recorded at
+  669, used at 883 across the returns at 685 and 789). The f2c translation left
+  t0..t5 as plain automatic locals, so those reads see an indeterminate value:
+  undefined behaviour in C, and the diagnostic clang reports. The original
+  Fortran these files were generated from carries a Save statement covering
+  exactly these variables.
+
+  The fix declares t0, t2 and t4 with IGRAPH_F77_SAVE, i.e. static thread-local
+  storage, which is the treatment every other cross-call local in these two files
+  already gets (first, j, ipj, irj, ivj, ulp, ierr, iter, unfl, ovfl, ...). t1, t3
+  and t5 are always written and read inside a single call, so they stay
+  automatic. These are timing values only: they are accumulated into
+  tmvopx/tmvbx/titref/tnaitr, which are written but never read anywhere in the
+  translation, so no numerical result, no control flow and no Arnoldi iteration
+  is affected.
+
+  A replayable patch against the pristine release is kept at
+  tools/patches/igraph-1.0.1-arpack-timing-save.patch (tools/ is excluded from
+  the R source package).
 
 
 2. Third-party components bundled inside igraph

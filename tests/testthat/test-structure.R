@@ -44,6 +44,25 @@ test_that("invalid native atom trees and native graph inputs fail safely", {
   # Native error handlers must have been restored: subsequent calls still work.
   check_dec(igraph::make_ring(5))
 })
+test_that("non-zero native error codes reach R with the igraph status text", {
+  # RCHECK() has to forward the real igraph error code to igraph_strerror().
+  # "Invalid value" comes only from that status text -- it is not part of the
+  # message template -- so matching it proves a genuine non-zero code was
+  # propagated.  When RCHECK's temporary shadowed the caller's variable it read an
+  # uninitialised code instead, and neither the branch nor the text could be
+  # trusted.
+  f <- gAtoms:::`_gAtoms_decompose_atoms_impl`
+  expect_error(.Call(f, matrix(c(0L, 0L), 1), FALSE, 1L), "Invalid value")
+  expect_error(.Call(f, matrix(integer(), 0, 2), FALSE, 2L), "Invalid value")
+  expect_error(native_order(list(1:2, 2:3, 3:4), rbind(c(1, 2), c(1, 2))), "Invalid value")
+  expect_error(native_order(list(1:2, 2:3, 3:4), rbind(c(1, 2), c(2, 3), c(3, 1))), "Invalid value")
+  # The status text must accompany the template, not replace it.
+  expect_error(.Call(f, matrix(c(0L, 0L), 1), FALSE, 1L), "must be simple/undirected")
+  # A failing call must leave no state behind: valid work still succeeds and the
+  # ordering entry point still returns the documented result.
+  check_dec(igraph::make_ring(5))
+  expect_identical(native_order(list(3:1), matrix(integer(), 0, 2)), list(3:1))
+})
 test_that("one atom, two atoms, chains and branching decompositions validate", {
   expect_length(prime_ordering(check_dec(igraph::make_full_graph(5))), 1L)
   d <- check_dec(igraph::make_graph(c(1, 2, 2, 3), directed = FALSE))

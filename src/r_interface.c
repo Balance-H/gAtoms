@@ -16,7 +16,14 @@ typedef struct {
     int graph_ok,tree_ok,ev_ok,sv_ok,h_ok,a_ok,s_ok,o_ok,handler_ok;
     igraph_error_handler_t *old_handler;
 } call_data;
-#define RCHECK(expr) do { igraph_error_t rc=(expr); if(rc) Rf_error("gAtoms native %s: %s (graph must be simple/undirected; atom tree must be connected with k vertices and k-1 edges)", #expr,igraph_strerror(rc)); } while(0)
+/* The temporary in RCHECK must not be called "rc": two call sites below already
+ * hold their own `igraph_error_t rc` and pass it in as RCHECK(rc).  When the
+ * temporary had that same name it shadowed the caller's variable, so the
+ * initialiser `igraph_error_t rc=(rc);` read the not-yet-initialised temporary
+ * instead of the caller's error code.  That is undefined behaviour, and exactly
+ * what clang -Wuninitialized reports.  A project-prefixed name keeps the
+ * caller's `rc` in scope inside the initialiser. */
+#define RCHECK(expr) do { igraph_error_t gAtoms_rc_=(expr); if(gAtoms_rc_) Rf_error("gAtoms native %s: %s (graph must be simple/undirected; atom tree must be connected with k vertices and k-1 edges)", #expr,igraph_strerror(gAtoms_rc_)); } while(0)
 static int whole(SEXP x,R_xlen_t i,const char *name) {
     double d;
     if(TYPEOF(x)==INTSXP) { int z=INTEGER(x)[i]; if(z!=NA_INTEGER) return z; }
